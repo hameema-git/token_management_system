@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseInit";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
-
+import { Link, useLocation } from "wouter";
 export default function ApprovedOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
