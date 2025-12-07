@@ -1,41 +1,35 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseInit";
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
-import { Link, useLocation } from "wouter";
+import { collection, getDocs } from "firebase/firestore";
+
 export default function ApprovedOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const session = new Date().toISOString().slice(0, 10);
-
-  async function fetchApproved() {
-    setLoading(true);
-
-    const q = query(
-      collection(db, "orders"),
-      where("status", "==", "approved"),
-      where("session_id", "==", session),
-      orderBy("token", "asc") // Sort by token
-    );
-
-    const snap = await getDocs(q);
-    setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-    setLoading(false);
-  }
 
   useEffect(() => {
-    fetchApproved();
+    async function loadOrders() {
+      setLoading(true);
+
+      const snap = await getDocs(collection(db, "orders"));
+
+      const approved = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(o => o.status === "approved");  // SIMPLE FILTER — NO INDEX NEEDED
+
+      setOrders(approved);
+      setLoading(false);
+    }
+
+    loadOrders();
   }, []);
 
   return (
     <div style={{ padding: 20 }}>
       <h1>Approved Orders (To Prepare)</h1>
 
-      {loading && <div>Loading...</div>}
+      {loading && <p>Loading...</p>}
 
-      {!loading && orders.length === 0 && (
-        <div>No approved orders yet.</div>
-      )}
+      {!loading && orders.length === 0 && <p>No approved orders yet.</p>}
 
       {!loading && orders.map(order => (
         <div key={order.id} style={{
@@ -44,19 +38,17 @@ export default function ApprovedOrders() {
           marginBottom: 10,
           borderRadius: 6
         }}>
-          <h3>Token #{order.token}</h3>
+          <h3>Token #{order.token ?? "-"}</h3>
 
-          <div><b>Name:</b> {order.customerName}</div>
-          <div><b>Phone:</b> {order.phone}</div>
+          <p><b>Name:</b> {order.customerName}</p>
+          <p><b>Phone:</b> {order.phone}</p>
 
-          <div style={{ marginTop: 6 }}>
-            <b>Items:</b>
-            <ul>
-              {(order.items || []).map((i, idx) => (
-                <li key={idx}>{i.quantity}× {i.name}</li>
-              ))}
-            </ul>
-          </div>
+          <b>Items:</b>
+          <ul>
+            {(order.items || []).map((i, idx) => (
+              <li key={idx}>{i.quantity}× {i.name}</li>
+            ))}
+          </ul>
         </div>
       ))}
     </div>
