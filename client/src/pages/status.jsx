@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseInit";
 import { query, collection, where, orderBy, limit, getDocs, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { Link } from "wouter";
+
 
 export default function TokenStatus() {
   const params = new URLSearchParams(window.location.search);

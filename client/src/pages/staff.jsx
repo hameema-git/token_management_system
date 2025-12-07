@@ -131,6 +131,10 @@ export default function StaffDashboard() {
           <div>
             <button type="submit">Sign in</button>
           </div>
+          <button onClick={() => window.location.href = "/approved"} style={{ marginLeft: 8 }}>
+  View Approved Orders
+</button>
+
         </form>
       )}
 
