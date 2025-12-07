@@ -58,6 +58,16 @@ export default function TokenStatus() {
     <Link href="/">
       <button style={{ marginTop: 20 }}>Place Another Order</button>
     </Link>
+
+    <button
+  onClick={() => {
+    const ph = localStorage.getItem("myPhone");
+    if (ph) setLocation(`/mytoken?phone=${ph}`);
+  }}
+  style={{ marginTop: 10 }}
+>
+  Refresh My Status
+</button>
         </div>
       )}
     </div>

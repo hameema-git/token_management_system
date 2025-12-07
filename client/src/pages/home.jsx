@@ -118,11 +118,20 @@ export default function Home() {
 
         <Link href="/staff">Staff</Link>
       </header>
-         <Link href="/status">
-  <button style={{ padding: "8px 14px", marginLeft: 10 }}>
-    Check My Token Status
-  </button>
-</Link>
+  <button 
+  onClick={() => {
+    const ph = localStorage.getItem("myPhone");
+    if (!ph) {
+      alert("No recent order found. Please place an order first.");
+      return;
+    }
+    setLocation(`/mytoken?phone=${encodeURIComponent(ph)}`);
+  }}
+  style={{ padding: "8px 14px", marginLeft: 10 }}
+>
+  Check My Token Status
+</button>
+
 
       <section style={{ marginTop: 20 }}>
         <h2>Menu</h2>
