@@ -131,9 +131,7 @@ export default function StaffDashboard() {
           <div>
             <button type="submit">Sign in</button>
           </div>
-          <button onClick={() => window.location.href = "/approved"} style={{ marginLeft: 8 }}>
-  View Approved Orders
-</button>
+  
 
         </form>
       )}
@@ -144,6 +142,9 @@ export default function StaffDashboard() {
             <button onClick={callNext}>Call Next</button>
             <button onClick={fetchOrders} style={{ marginLeft: 8 }}>Refresh Orders</button>
             <button onClick={logout} style={{ marginLeft: 8 }}>Sign out</button>
+                    <button onClick={() => window.location.href = "/approved"} style={{ marginLeft: 8 }}>
+  View Approved Orders
+</button>
           </div>
 
           <h3>Pending Orders</h3>
