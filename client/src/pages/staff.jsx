@@ -1,7 +1,22 @@
 import React, { useEffect, useState } from "react";
-import { auth, db } from "../firebaseInit";
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, getIdTokenResult } from "firebase/auth";
-import { collection, query, orderBy, limit, getDocs, doc, runTransaction } from "firebase/firestore";
+import { auth, db, serverTimestamp } from "../firebaseInit";
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  getIdTokenResult
+} from "firebase/auth";
+
+import {
+  collection,
+  query,
+  orderBy,
+  limit,
+  getDocs,
+  doc,
+  runTransaction
+} from "firebase/firestore";
+
 
 export default function StaffDashboard() {
   const [email, setEmail] = useState("");
