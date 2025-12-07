@@ -114,6 +114,12 @@ export default function Home() {
     <div style={{ padding: 20, maxWidth: 720, margin: "auto" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Cafe Queue</h1>
+        <Link href="/status">
+  <button style={{ padding: "8px 14px", marginLeft: 10 }}>
+    Check My Token Status
+  </button>
+</Link>
+
         <Link href="/staff">Staff</Link>
       </header>
 

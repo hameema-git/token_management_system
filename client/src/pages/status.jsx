@@ -52,6 +52,10 @@ export default function TokenStatus() {
           <div>
             Position: {orderInfo && orderInfo.token ? Math.max(0, orderInfo.token - current) : "-"}
           </div>
+           {/* ⭐ Add this button here */}
+    <Link href="/">
+      <button style={{ marginTop: 20 }}>Place Another Order</button>
+    </Link>
         </div>
       )}
     </div>

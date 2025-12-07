@@ -4,6 +4,7 @@ import { Switch, Route } from "wouter";
 import PlaceOrder from "./pages/home.jsx";
 import StaffDashboard from "./pages/staff.jsx";
 import TokenStatus from "./pages/status.jsx";
+import ApprovedOrders from "./pages/approved.jsx";
 
 export default function App() {
   return (
@@ -19,6 +20,10 @@ export default function App() {
       <Route path="/mytoken">
         <TokenStatus />
       </Route>
+      <Route path="/approved">
+  <ApprovedOrders />
+</Route>
+
 
       <Route>
         <div>404 Page Not Found</div>
