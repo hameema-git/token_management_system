@@ -26,7 +26,7 @@ export default function StaffDashboard() {
   const [isStaff, setIsStaff] = useState(false);
   const [orders, setOrders] = useState([]);
 
-  // ⭐ MANUAL SESSION
+  // ⭐ CURRENT SESSION
   const [session, setSession] = useState(
     localStorage.getItem("session") || "Session 1"
   );
@@ -74,12 +74,17 @@ export default function StaffDashboard() {
   }
 
   // -------------------------------
-  // FETCH ORDERS (current session only)
+  // FETCH PENDING ORDERS (current session)
   // -------------------------------
   async function fetchOrders() {
     setLoading(true);
 
-    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(200));
+    const q = query(
+      collection(db, "orders"),
+      orderBy("createdAt", "desc"),
+      limit(200)
+    );
+
     const snap = await getDocs(q);
 
     const filtered = snap.docs
@@ -94,8 +99,8 @@ export default function StaffDashboard() {
   // START NEW SESSION
   // -------------------------------
   async function startNewSession() {
-    const currentNum = Number(session.split(" ")[1]);
-    const newSession = `Session ${currentNum + 1}`;
+    const num = Number(session.split(" ")[1]);
+    const newSession = `Session ${num + 1}`;
 
     localStorage.setItem("session", newSession);
     setSession(newSession);
@@ -136,14 +141,12 @@ export default function StaffDashboard() {
     );
     if (newItems === null) return;
 
-    // Convert "2×Coffee, 1×Tea" → array
     const parsedItems = newItems.split(",").map(str => {
       const [qty, name] = str.split("×");
       return { quantity: Number(qty.trim()), name: name.trim() };
     });
 
-    const ref = doc(db, "orders", order.id);
-    await updateDoc(ref, {
+    await updateDoc(doc(db, "orders", order.id), {
       customerName: newName.trim(),
       phone: newPhone.trim(),
       items: parsedItems
@@ -170,7 +173,7 @@ export default function StaffDashboard() {
         const tokenRef = doc(db, "tokens", "session_" + session);
         const tSnap = await tx.get(tokenRef);
 
-        let last = tSnap.exists() ? (tSnap.data().lastTokenIssued || 0) : 0;
+        let last = tSnap.exists() ? tSnap.data().lastTokenIssued || 0 : 0;
         const next = last + 1;
 
         tx.set(tokenRef, {
@@ -213,7 +216,6 @@ export default function StaffDashboard() {
           const cur = snap.data().currentToken || 0;
           const last = snap.data().lastTokenIssued || 0;
           const next = Math.min(cur + 1, Math.max(last, cur + 1));
-
           tx.update(tokenRef, { currentToken: next });
         }
       });
@@ -250,6 +252,14 @@ export default function StaffDashboard() {
           <button onClick={callNext}>Call Next</button>
           <button onClick={fetchOrders} style={{ marginLeft: 10 }}>Refresh</button>
           <button onClick={logout} style={{ marginLeft: 10 }}>Logout</button>
+
+          {/* ⭐ VIEW APPROVED ORDERS BUTTON */}
+          <button
+            onClick={() => (window.location.href = "/approved")}
+            style={{ marginLeft: 10, background: "#6c5ce7", color: "white" }}
+          >
+            View Approved Orders
+          </button>
 
           <h3 style={{ marginTop: 20 }}>Pending Orders (Current Session)</h3>
 
