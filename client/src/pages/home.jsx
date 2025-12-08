@@ -70,7 +70,9 @@ export default function Home() {
   }
 
   try {
-    const session_id = new Date().toISOString().slice(0, 10);
+    // const session_id = new Date().toISOString().slice(0, 10);
+    const session_id = localStorage.getItem("session") || "Session 1";
+
 
     const items = cart.map(i => ({
       id: i.id,
