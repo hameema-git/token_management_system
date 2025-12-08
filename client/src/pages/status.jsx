@@ -8,7 +8,9 @@ export default function TokenStatus() {
   const params = new URLSearchParams(window.location.search);
   const initialPhone = params.get("phone") || localStorage.getItem("myPhone") || "";
   const [phone, setPhone] = useState(initialPhone);
-  const [session] = useState(new Date().toISOString().slice(0, 10));
+  // const [session] = useState(new Date().toISOString().slice(0, 10));
+  const [session] = useState(localStorage.getItem("session") || "Session 1");
+
   const [orderInfo, setOrderInfo] = useState(null);
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
