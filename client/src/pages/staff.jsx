@@ -21,39 +21,46 @@ import {
 export default function StaffDashboard() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [uidToken, setUidToken] = useState(null);
   const [isStaff, setIsStaff] = useState(false);
+
+  // ⭐ Sessions
+  const [sessionList, setSessionList] = useState([]);
+  const [session, setSession] = useState(localStorage.getItem("session") || "Session 1");
+
   const [orders, setOrders] = useState([]);
-
-  // ⭐ MANUAL SESSION (stored in localStorage)
-  const [session, setSession] = useState(
-    localStorage.getItem("session") || "Session 1"
-  );
-
   const [loading, setLoading] = useState(false);
 
   // -------------------------------
-  // LOGIN HANDLING
+  // Load all sessions
+  // -------------------------------
+  async function loadSessions() {
+    const snap = await getDocs(collection(db, "sessions"));
+    const list = snap.docs.map(d => d.id).sort();
+    setSessionList(list);
+
+    // If selected session does not exist, create it
+    if (!list.includes(session)) {
+      await setDoc(doc(db, "sessions", session), { createdAt: serverTimestamp() });
+      setSessionList(prev => [...prev, session]);
+    }
+  }
+
+  // -------------------------------
+  // Authentication
   // -------------------------------
   useEffect(() => {
+    loadSessions(); // load sessions on page load
+
     const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        setUidToken(null);
-        setIsStaff(false);
-        setOrders([]);
-        return;
-      }
+      if (!user) { setIsStaff(false); return; }
 
       const idTokenResult = await getIdTokenResult(user, true);
-      const role = idTokenResult.claims?.role;
-
-      if (role === "staff") {
+      if (idTokenResult.claims?.role === "staff") {
         setIsStaff(true);
-        setUidToken(await user.getIdToken());
-        fetchOrders();
+        fetchOrders(session);
       } else {
         setIsStaff(false);
-        alert("This user is not staff.");
+        alert("Not a staff account");
       }
     });
 
@@ -75,68 +82,74 @@ export default function StaffDashboard() {
   }
 
   // -------------------------------
-  // FETCH ALL ORDERS
+  // Fetch orders of selected session
   // -------------------------------
-  async function fetchOrders() {
+  async function fetchOrders(sessionName) {
     setLoading(true);
-    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(200));
-    const snap = await getDocs(q);
-    setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+    const snap = await getDocs(collection(db, "orders"));
+
+    const filtered = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(o => o.status === "pending" && o.session_id === sessionName);
+
+    setOrders(filtered);
     setLoading(false);
   }
 
+  // Reload orders whenever the session changes
+  useEffect(() => {
+    if (isStaff) fetchOrders(session);
+  }, [session]);
+
   // -------------------------------
-  // START NEW SESSION
+  // Start new session
   // -------------------------------
   async function startNewSession() {
-    const currentNum = Number(session.split(" ")[1]);
-    const newSession = `Session ${currentNum + 1}`;
+    const last = sessionList.length;
+    const newSession = `Session ${last + 1}`;
 
-    // Save new session locally
-    localStorage.setItem("session", newSession);
+    await setDoc(doc(db, "sessions", newSession), { createdAt: serverTimestamp() });
     setSession(newSession);
+    localStorage.setItem("session", newSession);
 
-    // Reset token document
-    const tokenRef = doc(db, "tokens", "session_" + newSession);
-    await setDoc(tokenRef, {
+    // Create token tracking doc
+    await setDoc(doc(db, "tokens", "session_" + newSession), {
       session_id: newSession,
       currentToken: 0,
       lastTokenIssued: 0
     });
 
+    setSessionList(prev => [...prev, newSession]);
     alert("New session started: " + newSession);
   }
 
   // -------------------------------
-  // APPROVE ORDER (assign token)
+  // Approve Order
   // -------------------------------
   async function approveOrder(orderId) {
     try {
       const orderRef = doc(db, "orders", orderId);
+
       await runTransaction(db, async (tx) => {
         const orderSnap = await tx.get(orderRef);
-        if (!orderSnap.exists()) throw new Error("Order gone");
+        if (!orderSnap.exists()) throw new Error("Order missing");
 
         const order = orderSnap.data();
-        if (order.status !== "pending") throw new Error("Not pending");
+        if (order.status !== "pending") throw new Error("Already approved");
 
         const tokenRef = doc(db, "tokens", "session_" + session);
         const tSnap = await tx.get(tokenRef);
 
-        let last = 0;
-        if (!tSnap.exists()) {
-          tx.set(tokenRef, {
-            session_id: session,
-            currentToken: 0,
-            lastTokenIssued: 0
-          });
-        } else {
-          last = tSnap.data().lastTokenIssued || 0;
-        }
-
+        let last = tSnap.exists() ? tSnap.data().lastTokenIssued : 0;
         const next = last + 1;
 
-        tx.update(tokenRef, { lastTokenIssued: next });
+        tx.set(tokenRef, {
+          session_id: session,
+          lastTokenIssued: next,
+          currentToken: tSnap.exists() ? tSnap.data().currentToken : 0
+        });
+
         tx.update(orderRef, {
           token: next,
           status: "approved",
@@ -145,38 +158,10 @@ export default function StaffDashboard() {
         });
       });
 
-      fetchOrders();
+      fetchOrders(session);
       alert("Order approved");
     } catch (err) {
-      alert("Approve failed: " + err.message);
-    }
-  }
-
-  // -------------------------------
-  // CALL NEXT TOKEN
-  // -------------------------------
-  async function callNext() {
-    try {
-      const tokenRef = doc(db, "tokens", "session_" + session);
-
-      await runTransaction(db, async (tx) => {
-        const tSnap = await tx.get(tokenRef);
-
-        if (!tSnap.exists()) {
-          tx.set(tokenRef, { session_id: session, currentToken: 1, lastTokenIssued: 0 });
-        } else {
-          const cur = tSnap.data().currentToken || 0;
-          const last = tSnap.data().lastTokenIssued || 0;
-          const next = Math.min(cur + 1, Math.max(last, cur + 1));
-
-          tx.update(tokenRef, { currentToken: next });
-        }
-      });
-
-      fetchOrders();
-      alert("Calling next token...");
-    } catch (err) {
-      alert("Next failed: " + err.message);
+      alert("Error approving: " + err.message);
     }
   }
 
@@ -187,56 +172,60 @@ export default function StaffDashboard() {
     <div style={{ padding: 20, maxWidth: 900, margin: "auto" }}>
       <h1>Staff Dashboard</h1>
 
-      {/* ⭐ SESSION TITLE */}
-      <h2>Current Session: {session}</h2>
+      {/* SESSION DROPDOWN */}
+      <h3>Current Session: {session}</h3>
+      <select
+        value={session}
+        onChange={e => {
+          setSession(e.target.value);
+          localStorage.setItem("session", e.target.value);
+        }}
+        style={{ padding: 8, marginBottom: 12 }}
+      >
+        {sessionList.map(s => (
+          <option key={s} value={s}>{s}</option>
+        ))}
+      </select>
 
-      {/* ⭐ START NEW SESSION BUTTON */}
-      {isStaff && (
-        <button onClick={startNewSession} style={{ marginBottom: 20 }}>
-          Start New Session
-        </button>
-      )}
+      {/* START NEW SESSION */}
+      <button onClick={startNewSession} style={{ marginLeft: 10 }}>
+        Start New Session
+      </button>
 
       {/* LOGIN FORM */}
       {!isStaff && (
-        <form onSubmit={login} style={{ marginBottom: 20 }}>
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
+        <form onSubmit={login} style={{ marginTop: 20 }}>
+          <input placeholder="Email" onChange={e => setEmail(e.target.value)} />
           <br />
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" />
+          <input type="password" placeholder="Password" onChange={e => setPassword(e.target.value)} />
           <br />
           <button type="submit">Login</button>
         </form>
       )}
 
+      {/* MAIN STAFF VIEW */}
       {isStaff && (
         <div>
-          <div style={{ marginBottom: 12 }}>
-            <button onClick={callNext}>Call Next</button>
-            <button onClick={fetchOrders} style={{ marginLeft: 8 }}>Refresh Orders</button>
-            <button onClick={logout} style={{ marginLeft: 8 }}>Sign out</button>
-
-            <button
-              onClick={() => (window.location.href = "/approved")}
-              style={{ marginLeft: 8 }}
-            >
+          <div style={{ marginTop: 20 }}>
+            <button onClick={() => window.location.href = "/approved"}>
               View Approved Orders
+            </button>
+            <button onClick={logout} style={{ marginLeft: 10 }}>
+              Logout
             </button>
           </div>
 
-          <h3>Pending Orders</h3>
+          <h3 style={{ marginTop: 20 }}>Pending Orders — {session}</h3>
 
-          {loading && <div>Loading…</div>}
+          {loading && <p>Loading...</p>}
 
-          {!loading &&
-            orders.filter(o => o.status === "pending").map(o => (
-              <div key={o.id} style={{ border: "1px solid #ddd", padding: 10, marginBottom: 8 }}>
-                <strong>{o.customerName} — {o.phone}</strong>
-                <div>{(o.items || []).map(i => `${i.quantity}× ${i.name}`).join(", ")}</div>
-                <button onClick={() => approveOrder(o.id)} style={{ marginTop: 8 }}>
-                  Approve
-                </button>
-              </div>
-            ))}
+          {!loading && orders.map(o => (
+            <div key={o.id} style={{ border: "1px solid #ccc", padding: 10, marginBottom: 10 }}>
+              <strong>{o.customerName} — {o.phone}</strong>
+              <p>{(o.items || []).map(i => `${i.quantity}× ${i.name}`).join(", ")}</p>
+              <button onClick={() => approveOrder(o.id)}>Approve</button>
+            </div>
+          ))}
         </div>
       )}
     </div>
