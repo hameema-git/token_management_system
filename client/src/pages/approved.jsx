@@ -114,8 +114,8 @@ export default function ApprovedOrders() {
         ))}
       </select>
 
-      {/* ⭐ SEARCH BAR */}
-      <input
+      ⭐ SEARCH BAR
+      {/* <input
         value={search}
         onChange={e => handleSearch(e.target.value)}
         placeholder="Search by name, phone, or token"
@@ -125,7 +125,7 @@ export default function ApprovedOrders() {
           marginBottom: 15,
           fontSize: 16
         }}
-      />
+      /> */}
 
       {loading && <p>Loading...</p>}
       {!loading && filtered.length === 0 && <p>No approved orders found.</p>}
