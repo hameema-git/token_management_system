@@ -118,7 +118,7 @@ export default function Home() {
         <h1>Cafe Queue</h1>
      
 
-        <Link href="/staff">Staff</Link>
+        {/* <Link href="/staff">Staff</Link> */}
       </header>
   <button 
   onClick={() => {
