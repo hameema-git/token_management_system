@@ -7,9 +7,6 @@ export default function ApprovedOrders() {
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ⭐ Load current session from localStorage
-  const currentSession = localStorage.getItem("session") || "Session 1";
-
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -19,11 +16,16 @@ export default function ApprovedOrders() {
       // Fetch all orders
       const snap = await getDocs(collection(db, "orders"));
 
-      // Filter: Approved + Current session
+      // Filter only APPROVED (from all sessions)
       const approved = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(o => o.status === "approved" && o.session_id === currentSession)
-        .sort((a, b) => (a.token || 0) - (b.token || 0));
+        .filter(o => o.status === "approved")
+        .sort((a, b) => {
+          // Sort by session, then by token
+          if (a.session_id < b.session_id) return -1;
+          if (a.session_id > b.session_id) return 1;
+          return (a.token || 0) - (b.token || 0);
+        });
 
       setOrders(approved);
       setFiltered(approved);
@@ -42,7 +44,8 @@ export default function ApprovedOrders() {
     const result = orders.filter(o =>
       (o.customerName || "").toLowerCase().includes(s) ||
       (o.phone || "").includes(s) ||
-      String(o.token).includes(s)
+      String(o.token).includes(s) ||
+      (o.session_id || "").toLowerCase().includes(s)
     );
 
     setFiltered(result);
@@ -50,13 +53,13 @@ export default function ApprovedOrders() {
 
   return (
     <div style={{ padding: 20 }}>
-      <h1>Approved Orders — {currentSession}</h1>
+      <h1>All Approved Orders</h1>
 
       {/* ⭐ SEARCH BAR */}
       <input
         value={search}
         onChange={e => handleSearch(e.target.value)}
-        placeholder="Search by name, phone, or token"
+        placeholder="Search by name, phone, token, or session"
         style={{
           padding: 8,
           width: "100%",
@@ -79,7 +82,10 @@ export default function ApprovedOrders() {
               borderRadius: 6
             }}
           >
-            <h3>Token #{order.token ?? "-"}</h3>
+            <h3>
+              Token #{order.token ?? "-"} — <span>{order.session_id}</span>
+            </h3>
+
             <p><b>Name:</b> {order.customerName}</p>
             <p><b>Phone:</b> {order.phone}</p>
 
