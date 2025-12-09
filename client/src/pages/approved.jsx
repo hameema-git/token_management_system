@@ -7,59 +7,118 @@ export default function ApprovedOrders() {
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [sessions, setSessions] = useState([]);
+  const [selectedSession, setSelectedSession] = useState("");
+
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    async function loadOrders() {
+    async function loadData() {
       setLoading(true);
 
-      // Fetch all orders
-      const snap = await getDocs(collection(db, "orders"));
-
-      // Filter only APPROVED (from all sessions)
-      const approved = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(o => o.status === "approved")
+      // ----------------------
+      // 1️⃣ Load all sessions from tokens collection
+      // ----------------------
+      const tokenSnap = await getDocs(collection(db, "tokens"));
+      const sessionList = tokenSnap.docs
+        .map(d => d.id.replace("session_", "")) // extract clean session name
         .sort((a, b) => {
-          // Sort by session, then by token
-          if (a.session_id < b.session_id) return -1;
-          if (a.session_id > b.session_id) return 1;
-          return (a.token || 0) - (b.token || 0);
+          const na = Number(a.split(" ")[1]);
+          const nb = Number(b.split(" ")[1]);
+          return na - nb;
         });
 
-      setOrders(approved);
-      setFiltered(approved);
+      // pick last session as default
+      const lastSession = sessionList[sessionList.length - 1] || "Session 1";
+
+      setSessions(sessionList);
+      setSelectedSession(lastSession);
+
+      // ----------------------
+      // 2️⃣ Load ALL approved orders
+      // ----------------------
+      const orderSnap = await getDocs(collection(db, "orders"));
+      const approvedOrders = orderSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(o => o.status === "approved");
+
+      setOrders(approvedOrders);
       setLoading(false);
+
+      // Apply default filter
+      applyFilters(approvedOrders, lastSession, "");
     }
 
-    loadOrders();
+    loadData();
   }, []);
 
-  // ⭐ SEARCH FUNCTION
-  function handleSearch(text) {
-    setSearch(text);
+  // ------------------------------
+  // Filter function
+  // ------------------------------
+  function applyFilters(orderList, session, searchText) {
+    let result = orderList;
 
-    const s = text.toLowerCase();
+    // session filter
+    if (session) {
+      result = result.filter(o => o.session_id === session);
+    }
 
-    const result = orders.filter(o =>
-      (o.customerName || "").toLowerCase().includes(s) ||
-      (o.phone || "").includes(s) ||
-      String(o.token).includes(s) ||
-      (o.session_id || "").toLowerCase().includes(s)
-    );
+    // search filter
+    if (searchText.trim() !== "") {
+      const s = searchText.toLowerCase();
+      result = result.filter(o =>
+        (o.customerName || "").toLowerCase().includes(s) ||
+        (o.phone || "").includes(s) ||
+        String(o.token).includes(s)
+      );
+    }
+
+    // sort tokens
+    result = result.sort((a, b) => (a.token || 0) - (b.token || 0));
 
     setFiltered(result);
   }
 
+  // session dropdown handler
+  function handleSessionChange(value) {
+    setSelectedSession(value);
+    applyFilters(orders, value, search);
+  }
+
+  // search handler
+  function handleSearch(text) {
+    setSearch(text);
+    applyFilters(orders, selectedSession, text);
+  }
+
   return (
     <div style={{ padding: 20 }}>
-      <h1>All Approved Orders</h1>
+      <h1>Approved Orders</h1>
+
+      {/* ⭐ SESSION SELECT DROPDOWN */}
+      <label style={{ fontSize: 14 }}>Select Session:</label>
+      <select
+        value={selectedSession}
+        onChange={(e) => handleSessionChange(e.target.value)}
+        style={{
+          padding: 8,
+          width: "100%",
+          marginBottom: 15,
+          fontSize: 16
+        }}
+      >
+        {sessions.map(s => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
 
       {/* ⭐ SEARCH BAR */}
       <input
         value={search}
         onChange={e => handleSearch(e.target.value)}
-        placeholder="Search by name, phone, token, or session"
+        placeholder="Search by name, phone, or token"
         style={{
           padding: 8,
           width: "100%",
@@ -69,7 +128,7 @@ export default function ApprovedOrders() {
       />
 
       {loading && <p>Loading...</p>}
-      {!loading && filtered.length === 0 && <p>No approved orders yet.</p>}
+      {!loading && filtered.length === 0 && <p>No approved orders found.</p>}
 
       {!loading &&
         filtered.map(order => (
@@ -83,7 +142,10 @@ export default function ApprovedOrders() {
             }}
           >
             <h3>
-              Token #{order.token ?? "-"} — <span>{order.session_id}</span>
+              Token #{order.token ?? "-"}  
+              <span style={{ color: "green", marginLeft: 10 }}>
+                ({order.session_id})
+              </span>
             </h3>
 
             <p><b>Name:</b> {order.customerName}</p>
@@ -100,3 +162,4 @@ export default function ApprovedOrders() {
     </div>
   );
 }
+
