@@ -12,13 +12,13 @@ import {
   onSnapshot
 } from "firebase/firestore";
 import { Link, useLocation } from "wouter";
+import "../styles.css";
 
 export default function TokenStatus() {
   const [, setLocation] = useLocation();
 
   const params = new URLSearchParams(window.location.search);
-  const initialPhone =
-    params.get("phone") || localStorage.getItem("myPhone") || "";
+  const initialPhone = params.get("phone") || localStorage.getItem("myPhone") || "";
 
   const [phone, setPhone] = useState(initialPhone);
   const [session, setSession] = useState(null);
@@ -27,31 +27,21 @@ export default function TokenStatus() {
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // ---------------------------
-  // ⭐ LOAD ACTIVE SESSION FROM FIRESTORE
-  // ---------------------------
+  // Load active session
   useEffect(() => {
     async function loadSession() {
       try {
-        const ref = doc(db, "settings", "activeSession");
-        const snap = await getDoc(ref);
-
-        if (snap.exists()) setSession(snap.data().session_id);
-        else setSession("Session 1");
-      } catch (err) {
-        console.error("Failed to load session:", err);
+        const snap = await getDoc(doc(db, "settings", "activeSession"));
+        setSession(snap.exists() ? snap.data().session_id : "Session 1");
+      } catch {
         setSession("Session 1");
       }
     }
-
     loadSession();
   }, []);
 
-  // ---------------------------
-  // Fetch order for this phone
-  // ---------------------------
   async function fetchMyToken(p) {
-    if (!p || !session) return;
+    if (!p || !session) return setOrderInfo(null);
 
     setLoading(true);
 
@@ -65,47 +55,37 @@ export default function TokenStatus() {
 
     const snap = await getDocs(q);
 
-    if (snap.empty) setOrderInfo(null);
-    else setOrderInfo({ id: snap.docs[0].id, ...snap.docs[0].data() });
-
+    setOrderInfo(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
     setLoading(false);
   }
 
-  // ---------------------------
-  // When session or phone changes, refresh data
-  // ---------------------------
   useEffect(() => {
-    if (!session) return; // wait until Firestore session loads
+    if (!session) return;
+
     fetchMyToken(phone);
 
     const tokenDoc = doc(db, "tokens", "session_" + session);
 
-    const unsub = onSnapshot(
-      tokenDoc,
-      (snap) => {
-        if (!snap.exists()) setCurrent(0);
-        else setCurrent(snap.data().currentToken || 0);
-      },
-      (err) => console.error(err)
-    );
+    const unsub = onSnapshot(tokenDoc, snap => {
+      setCurrent(snap.exists() ? snap.data().currentToken || 0 : 0);
+    });
 
     return () => unsub();
   }, [phone, session]);
 
-  // ---------------------------
-  // UI
-  // ---------------------------
   return (
-    <div style={{ padding: 20, maxWidth: 640, margin: "auto" }}>
-      <h1>My Token</h1>
+    <div className="container">
+      <h1 style={{ color: "#ffcc66" }}>My Token</h1>
 
-      <div style={{ marginBottom: 12 }}>
+      <div className="card">
         <input
-          placeholder="Enter phone"
+          className="input"
+          placeholder="Enter phone number"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={e => setPhone(e.target.value)}
         />
-        <button
+
+        <button className="button" style={{ marginTop: 10 }}
           onClick={() => {
             localStorage.setItem("myPhone", phone);
             fetchMyToken(phone);
@@ -115,41 +95,37 @@ export default function TokenStatus() {
         </button>
       </div>
 
-      {(!session || loading) && <div>Loading…</div>}
+      {loading && <div>Loading…</div>}
 
-      {session && !loading && (
-        <div>
-          <div>Now Serving: #{current}</div>
+      {orderInfo && (
+        <div className="token-box">
+          <h2>Now Serving</h2>
+          <div className="token-number">#{current}</div>
 
-          <div style={{ marginTop: 8 }}>
-            Token:{" "}
-            {orderInfo ? orderInfo.token ?? "Waiting for approval" : "-"}
+          <h2 style={{ marginTop: 20 }}>Your Token</h2>
+          <div className="token-number">
+            {orderInfo.token ?? "Waiting…"}
           </div>
 
-          <div>Status: {orderInfo ? orderInfo.status : "-"}</div>
+          <p>Status: {orderInfo.status}</p>
 
-          <div>
-            Position:{" "}
-            {orderInfo && orderInfo.token
-              ? Math.max(0, orderInfo.token - current)
-              : "-"}
-          </div>
+          <p style={{ marginTop: 10 }}>
+            <b>Total Amount:</b> ${orderInfo.total.toFixed(2)}
+          </p>
 
-          <Link href="/">
-            <button style={{ marginTop: 20 }}>Place Another Order</button>
-          </Link>
-
-          <button
-            onClick={() => {
-              const ph = localStorage.getItem("myPhone");
-              if (ph) setLocation(`/mytoken?phone=${ph}`);
-            }}
-            style={{ marginTop: 10 }}
-          >
-            Refresh My Status
-          </button>
+          {orderInfo.token && (
+            <p>
+              <b>People Ahead:</b> {Math.max(0, orderInfo.token - current)}
+            </p>
+          )}
         </div>
       )}
+
+      <Link href="/">
+        <button className="button" style={{ width: "100%", marginTop: 20 }}>
+          Place Another Order
+        </button>
+      </Link>
     </div>
   );
 }
