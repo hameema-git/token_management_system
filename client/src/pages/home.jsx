@@ -20,33 +20,34 @@ const MENU = [
     id: "w1",
     name: "Classic Belgian Waffle",
     price: 100,
-    img: "https://upload.wikimedia.org/wikipedia/commons/5/5f/Belgian_Waffle_-_Studio.jpg"
+    img: "/images/waffle1.jpeg"
   },
   {
     id: "w2",
     name: "Strawberry Cream Waffle",
     price: 150,
-    img: "https://images.unsplash.com/photo-1601924591479-9b3884d13e5c?auto=format&fit=crop&w=400&q=80"
+    img: "/images/waffle2.jpeg"
   },
   {
     id: "w3",
     name: "Nutella Chocolate Waffle",
     price: 180,
-    img: "https://images.unsplash.com/photo-1607252650355-f7fd0460cc31?auto=format&fit=crop&w=400&q=80"
+    img: "/images/waffle3.jpeg"
   },
   {
     id: "w4",
     name: "Banana Caramel Waffle",
     price: 150,
-    img: "https://images.unsplash.com/photo-1605478371780-16a3b405b718?auto=format&fit=crop&w=400&q=80"
+    img: "/images/waffle4.jpeg"
   },
   {
     id: "w5",
     name: "Blueberry Bliss Waffle",
     price: 180,
-    img: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD..."
+    img: "/images/waffle5.jpeg"
   }
 ];
+
 
 
 
