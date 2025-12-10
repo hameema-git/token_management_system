@@ -2,12 +2,11 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseInit";
 import {
-  query, collection, where, orderBy, limit, getDocs,
+  query, collection, where, getDocs,
   doc, getDoc, onSnapshot
 } from "firebase/firestore";
 import { Link, useLocation } from "wouter";
 import Footer from "../components/Footer";
-
 
 const styles = {
   page: {
@@ -21,7 +20,15 @@ const styles = {
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
   title: { fontSize: 22, fontWeight: 900, color: "#ffd166" },
   subtitle: { color: "#bfb39a", fontSize: 13 },
-  inputRow: { background: "#111", padding: 14, borderRadius: 10, marginBottom: 18, border: "1px solid rgba(255,209,102,0.05)" },
+
+  inputRow: {
+    background: "#111",
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 18,
+    border: "1px solid rgba(255,209,102,0.05)"
+  },
+
   input: {
     width: "100%",
     padding: 10,
@@ -32,7 +39,14 @@ const styles = {
     boxSizing: "border-box",
     fontSize: 15
   },
-  findBtn: { marginTop: 8, padding: "10px 14px", background: "#ffd166", color: "#111", border: "none", borderRadius: 8, fontWeight: 800, cursor: "pointer" },
+
+  findBtn: {
+    marginTop: 8, padding: "10px 14px",
+    background: "#ffd166", color: "#111",
+    border: "none", borderRadius: 8, fontWeight: 800,
+    cursor: "pointer"
+  },
+
   ticket: {
     marginTop: 12,
     padding: 20,
@@ -43,10 +57,12 @@ const styles = {
     gridTemplateColumns: "1fr",
     gap: 14
   },
+
   nowServing: { fontSize: 26, fontWeight: 900, color: "#ffffff", textAlign: "center" },
   bigToken: { fontSize: 64, fontWeight: 900, color: "#ffd166", textAlign: "center", letterSpacing: 2 },
   amountBox: { fontSize: 24, fontWeight: 900, color: "#ffd166", textAlign: "center", marginTop: 6 },
   smallMuted: { color: "#bfb39a", textAlign: "center", fontSize: 14 },
+
   actionRow: { display: "flex", gap: 10, marginTop: 18 },
   btn: { padding: "12px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800 },
   placeAnother: { background: "#222", color: "#ffd166", flex: 1 },
@@ -60,88 +76,95 @@ export default function TokenStatus() {
   const [phone, setPhone] = useState(initialPhone);
 
   const [session, setSession] = useState(null);
-  const [orderInfo, setOrderInfo] = useState(null);
+  const [orders, setOrders] = useState([]);   // store ALL approved orders
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // load active session from Firestore
+  // load session
   async function loadSessionFromFirestore() {
     try {
       const ref = doc(db, "settings", "activeSession");
       const snap = await getDoc(ref);
-      if (snap.exists()) return snap.data().session_id;
-      return "Session 1";
-    } catch (err) {
-      console.error("Failed to load session:", err);
+      return snap.exists() ? snap.data().session_id : "Session 1";
+    } catch {
       return "Session 1";
     }
   }
 
+  // initial load
   useEffect(() => {
-    // initial load
-    let mounted = true;
-    loadSessionFromFirestore().then(sess => { if (mounted) setSession(sess); });
-    return () => { mounted = false; };
+    loadSessionFromFirestore().then(setSession);
   }, []);
 
-  // fetch order for phone + session
-  async function fetchMyToken(p, sess = session) {
-    if (!p || !sess) return setOrderInfo(null);
+  // fetch all approved orders for phone
+  async function fetchAllOrders(p, sess = session) {
+    if (!p || !sess) return setOrders([]);
+
     setLoading(true);
     try {
       const q = query(
         collection(db, "orders"),
         where("phone", "==", String(p)),
-        where("session_id", "==", sess),
-        orderBy("createdAt", "desc"),
-        limit(1)
+        where("session_id", "==", sess)
       );
+
       const snap = await getDocs(q);
-      if (snap.empty) setOrderInfo(null);
-      else setOrderInfo({ id: snap.docs[0].id, ...snap.docs[0].data() });
+      if (snap.empty) {
+        setOrders([]);
+      } else {
+        let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // ONLY approved
+        list = list.filter(o => o.status === "Approved");
+
+        // SORT by token ascending
+        list.sort((a, b) => (a.token ?? 9999) - (b.token ?? 9999));
+
+        setOrders(list);
+      }
     } catch (err) {
-      console.error("fetchMyToken error:", err);
-      setOrderInfo(null);
-    } finally {
-      setLoading(false);
+      console.error("Error fetching all orders:", err);
+      setOrders([]);
     }
+
+    setLoading(false);
   }
 
-  // subscribe to token doc for current session and refresh order when session changes
+  // subscribe for now serving
   useEffect(() => {
     if (!session) return;
 
-    // fetch current order for phone
-    fetchMyToken(phone, session);
+    fetchAllOrders(phone, session);
 
     const tokenDoc = doc(db, "tokens", "session_" + session);
     const unsub = onSnapshot(tokenDoc, snap => {
-      if (!snap.exists()) setCurrent(0);
-      else setCurrent(snap.data().currentToken || 0);
-    }, err => console.error("tokens onSnapshot error:", err));
+      setCurrent(snap.exists() ? snap.data().currentToken : 0);
+    });
 
     return () => unsub();
   }, [phone, session]);
 
-  // explicit refresh handler: reload session then re-fetch order and token
+  // Refresh button
   async function handleRefresh() {
     const latestSession = await loadSessionFromFirestore();
     setSession(latestSession);
-    // fetch tokens doc will be handled by effect; refetch order explicitly
-    fetchMyToken(phone, latestSession);
+    fetchAllOrders(phone, latestSession);
   }
 
   return (
     <div style={styles.page}>
       <div style={styles.container}>
+
+        {/* Header */}
         <div style={styles.header}>
           <div>
             <div style={styles.title}>Waffle Lounge — Token Status</div>
-            <div style={styles.subtitle}>Track your order quickly</div>
+            <div style={styles.subtitle}>Track your orders</div>
           </div>
           <div style={styles.smallMuted}>Session: {session || "—"}</div>
         </div>
 
+        {/* Input */}
         <div style={styles.inputRow}>
           <input
             placeholder="Enter phone number"
@@ -153,48 +176,57 @@ export default function TokenStatus() {
             style={styles.findBtn}
             onClick={() => {
               localStorage.setItem("myPhone", phone);
-              fetchMyToken(phone, session);
+              fetchAllOrders(phone, session);
             }}
           >
             Find
           </button>
         </div>
 
-        {(!session || loading) && <div style={{ color: "#bfb39a", textAlign: "center" }}>Loading…</div>}
+        {/* Loading */}
+        {loading && <div style={{ color: "#bfb39a", textAlign: "center" }}>Loading…</div>}
 
-        {session && !loading && (
-          <>
-            <div style={styles.ticket}>
-              <div style={styles.nowServing}>NOW SERVING — #{current}</div>
-
-              <div style={styles.bigToken}>
-                {orderInfo ? (orderInfo.token ?? "WAITING") : "-"}
-              </div>
-
-              <div style={styles.amountBox}>
-                Amount: ₹{orderInfo ? (Number(orderInfo.total ?? 0).toFixed(2)) : "0.00"}
-              </div>
-
-              <div style={styles.smallMuted}>
-                {orderInfo && orderInfo.token ? `Position: ${Math.max(0, orderInfo.token - current)}` : ""}
-              </div>
-            </div>
-
-            <div style={styles.actionRow}>
-              <Link href="/">
-                <button style={{ ...styles.btn, ...styles.placeAnother }}>Place Another Order</button>
-              </Link>
-
-              <button
-                onClick={handleRefresh}
-                style={{ ...styles.btn, ...styles.refreshBtn }}
-              >
-                Refresh
-              </button>
-            </div>
-          </>
+        {/* No orders */}
+        {(!loading && orders.length === 0) && (
+          <div style={{ color: "#bfb39a", textAlign: "center", marginTop: 20 }}>
+            No Approved Orders Found
+          </div>
         )}
-         <Footer />
+
+        {/* Multiple Orders List */}
+        {orders.map(order => (
+          <div key={order.id} style={styles.ticket}>
+            <div style={styles.nowServing}>NOW SERVING — #{current}</div>
+
+            <div style={styles.bigToken}>{order.token}</div>
+
+            <div style={styles.amountBox}>Amount: ₹{Number(order.total ?? 0).toFixed(2)}</div>
+
+            <div style={styles.smallMuted}>
+              Position: {Math.max(0, order.token - current)}
+            </div>
+          </div>
+        ))}
+
+        {/* Buttons */}
+        {orders.length > 0 && (
+          <div style={styles.actionRow}>
+            <Link href="/">
+              <button style={{ ...styles.btn, ...styles.placeAnother }}>
+                Place Another Order
+              </button>
+            </Link>
+
+            <button
+              onClick={handleRefresh}
+              style={{ ...styles.btn, ...styles.refreshBtn }}
+            >
+              Refresh
+            </button>
+          </div>
+        )}
+
+        <Footer />
       </div>
     </div>
   );
