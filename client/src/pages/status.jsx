@@ -100,7 +100,29 @@ const styles = {
     fontWeight: 800
   },
   placeAnother: { background: "#222", color: "#ffd166", flex: 1 },
-  refreshBtn: { background: "#ffd166", color: "#111", flex: 1 }
+  refreshBtn: { background: "#ffd166", color: "#111", flex: 1 },
+
+  // styles for list
+  listContainer: { marginTop: 18 },
+  listItem: {
+    padding: 12,
+    borderRadius: 10,
+    background: "#0d0d0d",
+    border: "1px solid rgba(255,209,102,0.03)",
+    marginBottom: 10,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12
+  },
+  tokenBadge: {
+    fontSize: 22,
+    fontWeight: 900,
+    color: "#ffd166",
+    minWidth: 80,
+    textAlign: "center"
+  },
+  meta: { color: "#bfb39a", fontSize: 13, textAlign: "right" }
 };
 
 export default function TokenStatus() {
@@ -115,6 +137,9 @@ export default function TokenStatus() {
   const [orderInfo, setOrderInfo] = useState(null);
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  // New: store all orders for the phone
+  const [allOrders, setAllOrders] = useState([]);
 
   // Load active session
   async function loadSessionFromFirestore() {
@@ -139,9 +164,12 @@ export default function TokenStatus() {
     };
   }, []);
 
-  // Fetch order by phone + session
+  // Fetch the most recent order by phone + session (existing behavior)
   async function fetchMyToken(p, sess = session) {
-    if (!p || !sess) return setOrderInfo(null);
+    if (!p || !sess) {
+      setOrderInfo(null);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -169,11 +197,41 @@ export default function TokenStatus() {
     }
   }
 
-  // Subscribe to currentToken updates
+  // New: fetch all orders for a phone across all sessions (desc by createdAt)
+  async function fetchAllOrdersByPhone(p) {
+    if (!p) {
+      setAllOrders([]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const q = query(
+        collection(db, "orders"),
+        where("phone", "==", String(p)),
+        orderBy("createdAt", "desc")
+      );
+
+      const snap = await getDocs(q);
+      const orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setAllOrders(orders);
+    } catch (err) {
+      console.error("fetchAllOrdersByPhone error:", err);
+      setAllOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Subscribe to currentToken updates and refresh order/allOrders when session changes
   useEffect(() => {
     if (!session) return;
 
+    // fetch the latest single order for the session
     fetchMyToken(phone, session);
+
+    // fetch all orders for the phone (across sessions)
+    fetchAllOrdersByPhone(phone);
 
     const tokenDoc = doc(db, "tokens", "session_" + session);
 
@@ -187,13 +245,37 @@ export default function TokenStatus() {
     );
 
     return () => unsub();
+    // we intentionally want to re-run when phone or session changes
   }, [phone, session]);
 
-  // Manual refresh
+  // Manual refresh: reload session, single order and all orders
   async function handleRefresh() {
     const latestSession = await loadSessionFromFirestore();
     setSession(latestSession);
     fetchMyToken(phone, latestSession);
+    fetchAllOrdersByPhone(phone);
+  }
+
+  // When user clicks Find: save phone and fetch
+  function handleFindClick() {
+    localStorage.setItem("myPhone", phone);
+    fetchMyToken(phone, session);
+    fetchAllOrdersByPhone(phone);
+  }
+
+  // helper to format Firestore timestamp safely
+  function formatTimestamp(ts) {
+    try {
+      if (!ts) return "";
+      // if it's Firestore Timestamp object
+      if (typeof ts.toDate === "function") return ts.toDate().toLocaleString();
+      // if it's already a Date
+      if (ts instanceof Date) return ts.toLocaleString();
+      // otherwise return as string
+      return String(ts);
+    } catch {
+      return "";
+    }
   }
 
   return (
@@ -215,13 +297,7 @@ export default function TokenStatus() {
             style={styles.input}
           />
 
-          <button
-            style={styles.findBtn}
-            onClick={() => {
-              localStorage.setItem("myPhone", phone);
-              fetchMyToken(phone, session);
-            }}
-          >
+          <button style={styles.findBtn} onClick={handleFindClick}>
             Find
           </button>
         </div>
@@ -243,17 +319,12 @@ export default function TokenStatus() {
 
               <div style={styles.amountBox}>
                 Amount: ₹
-                {orderInfo
-                  ? Number(orderInfo.total ?? 0).toFixed(2)
-                  : "0.00"}
+                {orderInfo ? Number(orderInfo.total ?? 0).toFixed(2) : "0.00"}
               </div>
 
               <div style={styles.smallMuted}>
                 {orderInfo && orderInfo.token
-                  ? `Position: ${Math.max(
-                      0,
-                      orderInfo.token - current
-                    )}`
+                  ? `Position: ${Math.max(0, orderInfo.token - current)}`
                   : ""}
               </div>
             </div>
@@ -274,6 +345,42 @@ export default function TokenStatus() {
             </div>
           </>
         )}
+
+        {/* ALL ORDERS LIST */}
+        <div style={styles.listContainer}>
+          <div style={{ color: "#bfb39a", marginBottom: 8 }}>
+            All tokens for {phone || "—"}
+          </div>
+
+          {allOrders.length === 0 && (
+            <div style={{ color: "#777" }}>No orders found.</div>
+          )}
+
+          {allOrders.map((o) => (
+            <div key={o.id} style={styles.listItem}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={styles.tokenBadge}>{o.token ?? "—"}</div>
+                <div>
+                  <div style={{ fontWeight: 800, color: "#fff" }}>
+                    {o.session_id ?? "Session —"}
+                  </div>
+                  <div style={{ color: "#bfb39a", fontSize: 13 }}>
+                    Amount: ₹{Number(o.total ?? 0).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              <div style={styles.meta}>
+                <div>{formatTimestamp(o.createdAt)}</div>
+                <div style={{ marginTop: 6 }}>
+                  {o.token && typeof current === "number"
+                    ? `Position: ${Math.max(0, o.token - current)}`
+                    : ""}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
 
         <Footer />
       </div>
