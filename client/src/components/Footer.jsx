@@ -18,7 +18,7 @@ export default function Footer() {
         href="https://www.codeleaf.co.in"
         target="_blank"
         rel="noopener noreferrer"
-        style={{ color: "#ffd166" }}
+        style={{ color: "#044b55" }}
       >
         www.codeleaf.co.in
       </a>

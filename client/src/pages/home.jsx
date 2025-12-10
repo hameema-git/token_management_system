@@ -19,38 +19,32 @@ const MENU = [
   {
     id: "w1",
     name: "Classic Belgian Waffle",
-    price: 6.5,
-    img: "https://images.unsplash.com/photo-1505250469679-203ad9ced0cb?w=300&auto=format&fit=crop&q=60"
+    price: 100,
+    img: "https://images.unsplash.com/photo-1588196749597-9ff075ee6b5b?auto=format&fit=crop&w=300&q=80"
   },
   {
     id: "w2",
     name: "Strawberry Cream Waffle",
-    price: 8.5,
-    img: "https://images.unsplash.com/photo-1499638309848-e9968540da3b?w=300&auto=format&fit=crop&q=60"
+    price: 150,
+    img: "https://images.unsplash.com/photo-1601924582975-7d68d9a4e2fa?auto=format&fit=crop&w=300&q=80"
   },
   {
     id: "w3",
     name: "Nutella Chocolate Waffle",
-    price: 9.0,
-    img: "https://images.unsplash.com/photo-1598214886806-c87b84b1e4c3?w=300&auto=format&fit=crop&q=60"
+    price: 180,
+    img: "https://images.unsplash.com/photo-1606851092834-80e46068e930?auto=format&fit=crop&w=300&q=80"
   },
   {
     id: "w4",
     name: "Banana Caramel Waffle",
-    price: 7.5,
-    img: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=300&auto=format&fit=crop&q=60"
+    price: 150,
+    img: "https://images.unsplash.com/photo-1612198793932-bd42c1f7bfc1?auto=format&fit=crop&w=300&q=80"
   },
   {
     id: "w5",
     name: "Blueberry Bliss Waffle",
-    price: 8.0,
-    img: "https://images.unsplash.com/photo-1551022377-3f4f54c9a931?w=300&auto=format&fit=crop&q=60"
-  },
-  {
-    id: "w6",
-    name: "Honey Butter Waffle",
-    price: 6.0,
-    img: "https://images.unsplash.com/photo-1588196749597-9ff075ee6b5b?w=300&auto=format&fit=crop&q=60"
+    price: 180,
+    img: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD..."
   }
 ];
 
