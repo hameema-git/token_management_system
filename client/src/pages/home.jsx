@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { db, serverTimestamp } from "../firebaseInit";
 import { collection, addDoc, doc, getDoc } from "firebase/firestore";
+import Footer from "../components/Footer";
 
 /*
   MENU has small thumbnail images (80x80). You can replace image URLs
@@ -19,39 +20,40 @@ const MENU = [
     id: "w1",
     name: "Classic Belgian Waffle",
     price: 6.5,
-    img: "https://picsum.photos/seed/waffle1/200/200"
+    img: "https://images.unsplash.com/photo-1505250469679-203ad9ced0cb?w=300&auto=format&fit=crop&q=60"
   },
   {
     id: "w2",
-    name: "Chocolate Drizzle Waffle",
-    price: 7.5,
-    img: "https://picsum.photos/seed/waffle2/200/200"
+    name: "Strawberry Cream Waffle",
+    price: 8.5,
+    img: "https://images.unsplash.com/photo-1499638309848-e9968540da3b?w=300&auto=format&fit=crop&q=60"
   },
   {
     id: "w3",
-    name: "Strawberry Whipped Waffle",
-    price: 8.0,
-    img: "https://picsum.photos/seed/waffle3/200/200"
+    name: "Nutella Chocolate Waffle",
+    price: 9.0,
+    img: "https://images.unsplash.com/photo-1598214886806-c87b84b1e4c3?w=300&auto=format&fit=crop&q=60"
   },
   {
     id: "w4",
     name: "Banana Caramel Waffle",
-    price: 8.5,
-    img: "https://picsum.photos/seed/waffle4/200/200"
+    price: 7.5,
+    img: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=300&auto=format&fit=crop&q=60"
   },
   {
     id: "w5",
-    name: "Nutella Loaded Waffle",
-    price: 9.0,
-    img: "https://picsum.photos/seed/waffle5/200/200"
+    name: "Blueberry Bliss Waffle",
+    price: 8.0,
+    img: "https://images.unsplash.com/photo-1551022377-3f4f54c9a931?w=300&auto=format&fit=crop&q=60"
   },
   {
     id: "w6",
-    name: "Blueberry Delight Waffle",
-    price: 8.5,
-    img: "https://picsum.photos/seed/waffle6/200/200"
+    name: "Honey Butter Waffle",
+    price: 6.0,
+    img: "https://images.unsplash.com/photo-1588196749597-9ff075ee6b5b?w=300&auto=format&fit=crop&q=60"
   }
 ];
+
 
 
 const styles = {
@@ -253,6 +255,7 @@ export default function Home() {
           </aside>
         )}
       </section>
+       <Footer />
     </div>
   );
 }
