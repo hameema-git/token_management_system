@@ -102,27 +102,14 @@ const styles = {
   placeAnother: { background: "#222", color: "#ffd166", flex: 1 },
   refreshBtn: { background: "#ffd166", color: "#111", flex: 1 },
 
-  // list styles
+  // list styles (we'll render ticket-style cards)
   listContainer: { marginTop: 18 },
-  listItem: {
-    padding: 12,
-    borderRadius: 10,
-    background: "#0d0d0d",
-    border: "1px solid rgba(255,209,102,0.03)",
-    marginBottom: 10,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12
-  },
-  tokenBadge: {
-    fontSize: 22,
-    fontWeight: 900,
-    color: "#ffd166",
-    minWidth: 80,
-    textAlign: "center"
-  },
-  meta: { color: "#bfb39a", fontSize: 13, textAlign: "right" }
+  smallHint: { color: "#bfb39a", marginBottom: 8 },
+  smallListWrap: {
+    display: "grid",
+    gap: 12,
+    marginTop: 8
+  }
 };
 
 export default function TokenStatus() {
@@ -134,11 +121,11 @@ export default function TokenStatus() {
 
   const [phone, setPhone] = useState(initialPhone);
   const [session, setSession] = useState(null);
-  const [orderInfo, setOrderInfo] = useState(null);
+  const [orderInfo, setOrderInfo] = useState(null); // most recent single order
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // new states to store all orders and the tokens-only array
+  // all orders and tokens
   const [allOrders, setAllOrders] = useState([]);
   const [tokensOnly, setTokensOnly] = useState([]);
 
@@ -165,7 +152,7 @@ export default function TokenStatus() {
     };
   }, []);
 
-  // The existing single latest-order fetch (keeps your original behaviour)
+  // existing latest-order fetch (keeps original behaviour)
   async function fetchMyToken(p, sess = session) {
     if (!p || !sess) {
       setOrderInfo(null);
@@ -185,11 +172,7 @@ export default function TokenStatus() {
       const snap = await getDocs(q);
 
       if (snap.empty) setOrderInfo(null);
-      else
-        setOrderInfo({
-          id: snap.docs[0].id,
-          ...snap.docs[0].data()
-        });
+      else setOrderInfo({ id: snap.docs[0].id, ...snap.docs[0].data() });
     } catch (err) {
       console.error("fetchMyToken error:", err);
       setOrderInfo(null);
@@ -198,12 +181,7 @@ export default function TokenStatus() {
     }
   }
 
-  /**
-   * Robust loader that gets ALL orders for a phone:
-   * - tries phone as string with orderBy(createdAt)
-   * - if that fails (createdAt missing), falls back to no-order query and sorts locally
-   * - also tries numeric phone if stored as number
-   */
+  // Robust loader to get ALL orders for a phone (handles string/number and missing createdAt)
   async function loadAllOrdersForPhone(rawPhone) {
     if (!rawPhone) {
       setAllOrders([]);
@@ -213,7 +191,6 @@ export default function TokenStatus() {
 
     setLoading(true);
 
-    // helper to run a query and map docs
     async function runQuery(q) {
       const snap = await getDocs(q);
       return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -228,24 +205,21 @@ export default function TokenStatus() {
         where("phone", "==", phoneTrim),
         orderBy("createdAt", "desc")
       );
-      let orders = await runQuery(q1);
+      const orders = await runQuery(q1);
       if (orders.length > 0) {
-        setAllOrders(orders);
-        setTokensOnly(dedupeTokensPreserveOrder(orders));
-        setLoading(false);
+        finalizeOrders(orders);
         return;
       }
     } catch (err) {
-      // likely some docs missing createdAt or orderBy caused error — continue to fallback
       console.warn("orderBy(createdAt) failed for string phone, falling back:", err);
     }
 
-    // attempt 2: numeric phone (if digits exist)
+    // attempt 2: numeric phone attempts
     const numeric = phoneTrim.replace(/\D/g, "");
     if (numeric) {
       try {
         const numVal = Number(numeric);
-        // try with orderBy(createdAt)
+
         try {
           const q2 = query(
             collection(db, "orders"),
@@ -254,23 +228,18 @@ export default function TokenStatus() {
           );
           const ordersNum = await runQuery(q2);
           if (ordersNum.length > 0) {
-            setAllOrders(ordersNum);
-            setTokensOnly(dedupeTokensPreserveOrder(ordersNum));
-            setLoading(false);
+            finalizeOrders(ordersNum);
             return;
           }
         } catch (err) {
           console.warn("orderBy(createdAt) failed for numeric phone, falling back:", err);
         }
 
-        // fallback: numeric without orderBy
+        // fallback numeric without ordering
         const q3 = query(collection(db, "orders"), where("phone", "==", numVal));
         const ordersNumPlain = await runQuery(q3);
         if (ordersNumPlain.length > 0) {
-          const sorted = sortByCreatedAtDesc(ordersNumPlain);
-          setAllOrders(sorted);
-          setTokensOnly(dedupeTokensPreserveOrder(sorted));
-          setLoading(false);
+          finalizeOrders(sortByCreatedAtDesc(ordersNumPlain));
           return;
         }
       } catch (err) {
@@ -283,10 +252,7 @@ export default function TokenStatus() {
       const q4 = query(collection(db, "orders"), where("phone", "==", phoneTrim));
       const ordersPlain = await runQuery(q4);
       if (ordersPlain.length > 0) {
-        const sorted = sortByCreatedAtDesc(ordersPlain);
-        setAllOrders(sorted);
-        setTokensOnly(dedupeTokensPreserveOrder(sorted));
-        setLoading(false);
+        finalizeOrders(sortByCreatedAtDesc(ordersPlain));
         return;
       }
     } catch (err) {
@@ -296,6 +262,30 @@ export default function TokenStatus() {
     // nothing found
     setAllOrders([]);
     setTokensOnly([]);
+    setLoading(false);
+  }
+
+  // finalize orders: dedupe tokens, produce tokensOnly sorted ascending
+  function finalizeOrders(ordersDescByCreatedAt) {
+    // ordersDescByCreatedAt expected newest->oldest; keep full objects as-is
+    setAllOrders(ordersDescByCreatedAt);
+
+    // dedupe tokens preserving the order provided, but for tokensOnly we will sort ascending
+    const uniqueTokensSet = new Set();
+    for (const o of ordersDescByCreatedAt) {
+      const t = o.token;
+      if (t === undefined || t === null) continue;
+      uniqueTokensSet.add(t);
+    }
+    // convert to array and sort ascending numerically when possible
+    const uniqArray = Array.from(uniqueTokensSet);
+    const sortedAsc = uniqArray.slice().sort((a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      if (!isFinite(na) || !isFinite(nb)) return String(a).localeCompare(String(b));
+      return na - nb;
+    });
+    setTokensOnly(sortedAsc);
     setLoading(false);
   }
 
@@ -314,29 +304,11 @@ export default function TokenStatus() {
     });
   }
 
-  // helper: dedupe tokens while preserving doc order
-  function dedupeTokensPreserveOrder(orders) {
-    const seen = new Set();
-    const tokens = [];
-    for (const o of orders) {
-      const t = o.token ?? null;
-      if (t === null || t === undefined) continue;
-      if (!seen.has(t)) {
-        seen.add(t);
-        tokens.push(t);
-      }
-    }
-    return tokens;
-  }
-
-  // Subscribe to currentToken updates and refresh order/allOrders when session changes or phone changes
+  // Subscribe to currentToken updates and refresh on phone/session change
   useEffect(() => {
     if (!session) return;
 
-    // latest single order (existing)
     fetchMyToken(phone, session);
-
-    // full orders list
     loadAllOrdersForPhone(phone);
 
     const tokenDoc = doc(db, "tokens", "session_" + session);
@@ -353,7 +325,7 @@ export default function TokenStatus() {
     return () => unsub();
   }, [phone, session]);
 
-  // Manual refresh: reload session, single order and all orders
+  // Manual refresh
   async function handleRefresh() {
     const latestSession = await loadSessionFromFirestore();
     setSession(latestSession);
@@ -361,14 +333,14 @@ export default function TokenStatus() {
     loadAllOrdersForPhone(phone);
   }
 
-  // When user clicks Find: save phone and fetch
+  // When user clicks Find
   function handleFindClick() {
     localStorage.setItem("myPhone", phone);
     fetchMyToken(phone, session);
     loadAllOrdersForPhone(phone);
   }
 
-  // helper to format Firestore timestamp safely
+  // helper to format timestamp
   function formatTimestamp(ts) {
     try {
       if (!ts) return "";
@@ -378,6 +350,29 @@ export default function TokenStatus() {
     } catch {
       return "";
     }
+  }
+
+  // Render a ticket-like card for an order (same style as main)
+  function OrderTicket({ order }) {
+    return (
+      <div style={styles.ticket}>
+        <div style={styles.nowServing}>Session: {order.session_id ?? session ?? "—"}</div>
+
+        <div style={styles.bigToken}>{order.token ?? "—"}</div>
+
+        <div style={styles.amountBox}>
+          Amount: ₹{Number(order.total ?? 0).toFixed(2)}
+        </div>
+
+        <div style={styles.smallMuted}>
+          {order.createdAt ? formatTimestamp(order.createdAt) : ""}
+        </div>
+
+        <div style={styles.smallMuted}>
+          {order.token ? `Position: ${Math.max(0, order.token - current)}` : ""}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -405,13 +400,12 @@ export default function TokenStatus() {
         </div>
 
         {(!session || loading) && (
-          <div style={{ color: "#bfb39a", textAlign: "center" }}>
-            Loading…
-          </div>
+          <div style={{ color: "#bfb39a", textAlign: "center" }}>Loading…</div>
         )}
 
         {session && !loading && (
           <>
+            {/* Main (most-recent single order) */}
             <div style={styles.ticket}>
               <div style={styles.nowServing}>NOW SERVING — #{current}</div>
 
@@ -448,41 +442,25 @@ export default function TokenStatus() {
           </>
         )}
 
-        {/* ALL ORDERS LIST */}
-        <div style={styles.listContainer}>
-          <div style={{ color: "#bfb39a", marginBottom: 8 }}>
-            All tokens for {phone || "—"}
-          </div>
+        {/* ALL TOKENS: show ONLY when > 1 token */}
+        {tokensOnly.length > 1 && (
+          <div style={styles.listContainer}>
+            <div style={styles.smallHint}>All tokens for {phone || "—"}</div>
 
-          {allOrders.length === 0 && (
-            <div style={{ color: "#777" }}>No orders found.</div>
-          )}
-
-          {allOrders.map((o) => (
-            <div key={o.id} style={styles.listItem}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={styles.tokenBadge}>{o.token ?? "—"}</div>
-                <div>
-                  <div style={{ fontWeight: 800, color: "#fff" }}>
-                    {o.session_id ?? "Session —"}
-                  </div>
-                  <div style={{ color: "#bfb39a", fontSize: 13 }}>
-                    Amount: ₹{Number(o.total ?? 0).toFixed(2)}
-                  </div>
-                </div>
-              </div>
-
-              <div style={styles.meta}>
-                <div>{formatTimestamp(o.createdAt)}</div>
-                <div style={{ marginTop: 6 }}>
-                  {o.token && typeof current === "number"
-                    ? `Position: ${Math.max(0, o.token - current)}`
-                    : ""}
-                </div>
-              </div>
+            <div style={styles.smallListWrap}>
+              {/* tokensOnly is an array of token values sorted ascending.
+                  For each token, find the first order doc that has that token (prefer newer one).
+                  This keeps ticket details (amount, session, createdAt) meaningful. */}
+              {tokensOnly.map((tk) => {
+                // find the first matching order in allOrders (orders are newest->oldest)
+                const match = allOrders.find((o) => String(o.token) === String(tk));
+                // If no matching order doc found (shouldn't happen), create a minimal object
+                const orderObj = match || { token: tk, total: 0, session_id: session };
+                return <OrderTicket key={String(tk)} order={orderObj} />;
+              })}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
 
         <Footer />
       </div>
