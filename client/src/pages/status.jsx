@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseInit";
 import {
-  query, collection, where, orderBy, getDocs,
+  query, collection, where, getDocs,
   doc, getDoc, onSnapshot
 } from "firebase/firestore";
 import { Link, useLocation } from "wouter";
@@ -18,7 +18,7 @@ const styles = {
   },
   container: { maxWidth: 720, margin: "auto" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
-  title: { fontSize: 24, fontWeight: 900, color: "#ffd166" },
+  title: { fontSize: 22, fontWeight: 900, color: "#ffd166" },
   subtitle: { color: "#bfb39a", fontSize: 13 },
 
   inputRow: {
@@ -28,6 +28,7 @@ const styles = {
     marginBottom: 18,
     border: "1px solid rgba(255,209,102,0.05)"
   },
+
   input: {
     width: "100%",
     padding: 10,
@@ -38,139 +39,117 @@ const styles = {
     boxSizing: "border-box",
     fontSize: 15
   },
+
   findBtn: {
-    marginTop: 8,
-    padding: "10px 14px",
-    background: "#ffd166",
-    color: "#111",
-    border: "none",
-    borderRadius: 8,
-    fontWeight: 800,
+    marginTop: 8, padding: "10px 14px",
+    background: "#ffd166", color: "#111",
+    border: "none", borderRadius: 8, fontWeight: 800,
     cursor: "pointer"
   },
 
-  bigPanel: {
-    background: "#111",
+  ticket: {
+    marginTop: 12,
     padding: 20,
     borderRadius: 12,
-    marginTop: 12,
-    borderLeft: "8px solid #ffd166"
+    background: "#111",
+    borderLeft: "8px solid #ffd166",
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: 14
   },
 
-  nowServing: {
-    fontSize: 28,
-    fontWeight: 900,
-    color: "#ffffff",
-    textAlign: "center",
-    marginBottom: 10
-  },
-
-  listItem: {
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 10,
-    background: "#1a1a1a",
-    border: "1px solid rgba(255,209,102,0.2)"
-  },
-  listItemNext: {
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 12,
-    background: "#332500",
-    border: "2px solid #ffd166",
-    boxShadow: "0 0 12px rgba(255,209,102,0.5)"
-  },
-
-  token: { fontSize: 32, fontWeight: 900, color: "#ffd166" },
-  amount: { fontSize: 20, fontWeight: 800, marginTop: 4, color: "#ffd166" },
-  smallText: { color: "#bfb39a", marginTop: 4 },
+  nowServing: { fontSize: 26, fontWeight: 900, color: "#ffffff", textAlign: "center" },
+  bigToken: { fontSize: 64, fontWeight: 900, color: "#ffd166", textAlign: "center", letterSpacing: 2 },
+  amountBox: { fontSize: 24, fontWeight: 900, color: "#ffd166", textAlign: "center", marginTop: 6 },
+  smallMuted: { color: "#bfb39a", textAlign: "center", fontSize: 14 },
 
   actionRow: { display: "flex", gap: 10, marginTop: 18 },
-  btn: { padding: "12px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, flex: 1 },
-  placeAnother: { background: "#222", color: "#ffd166" },
-  refreshBtn: { background: "#ffd166", color: "#111" }
+  btn: { padding: "12px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800 },
+  placeAnother: { background: "#222", color: "#ffd166", flex: 1 },
+  refreshBtn: { background: "#ffd166", color: "#111", flex: 1 }
 };
 
 export default function TokenStatus() {
   const [, setLocation] = useLocation();
   const params = new URLSearchParams(window.location.search);
-
   const initialPhone = params.get("phone") || localStorage.getItem("myPhone") || "";
   const [phone, setPhone] = useState(initialPhone);
 
   const [session, setSession] = useState(null);
-  const [approvedOrders, setApprovedOrders] = useState([]);
+  const [orders, setOrders] = useState([]);   // store ALL approved orders
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // Load active session
+  // load session
   async function loadSessionFromFirestore() {
     try {
       const ref = doc(db, "settings", "activeSession");
       const snap = await getDoc(ref);
       return snap.exists() ? snap.data().session_id : "Session 1";
-    } catch (err) {
-      console.error("Failed to load session:", err);
+    } catch {
       return "Session 1";
     }
   }
 
+  // initial load
   useEffect(() => {
     loadSessionFromFirestore().then(setSession);
   }, []);
 
-  // Fetch all approved orders
-  async function fetchApprovedOrders(p, sess) {
-    if (!p || !sess) return setApprovedOrders([]);
+  // fetch all approved orders for phone
+  async function fetchAllOrders(p, sess = session) {
+    if (!p || !sess) return setOrders([]);
 
     setLoading(true);
     try {
       const q = query(
         collection(db, "orders"),
-        where("phone", "==", p),
-        where("session_id", "==", sess),
-        where("status", "==", "approved"),
-        orderBy("token", "asc")
+        where("phone", "==", String(p)),
+        where("session_id", "==", sess)
       );
 
       const snap = await getDocs(q);
-      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (snap.empty) {
+        setOrders([]);
+      } else {
+        let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      setApprovedOrders(list);
+        // ONLY approved
+        list = list.filter(o => o.status === "Approved");
+
+        // SORT by token ascending
+        list.sort((a, b) => (a.token ?? 9999) - (b.token ?? 9999));
+
+        setOrders(list);
+      }
     } catch (err) {
-      console.error("fetchApprovedOrders error:", err);
-      setApprovedOrders([]);
+      console.error("Error fetching all orders:", err);
+      setOrders([]);
     }
+
     setLoading(false);
   }
 
-  // Subscribe to NOW SERVING updates
+  // subscribe for now serving
   useEffect(() => {
     if (!session) return;
 
+    fetchAllOrders(phone, session);
+
     const tokenDoc = doc(db, "tokens", "session_" + session);
     const unsub = onSnapshot(tokenDoc, snap => {
-      setCurrent(snap.exists() ? snap.data().currentToken || 0 : 0);
+      setCurrent(snap.exists() ? snap.data().currentToken : 0);
     });
 
     return () => unsub();
-  }, [session]);
-
-  // Refresh token list when phone/session changes
-  useEffect(() => {
-    if (session) fetchApprovedOrders(phone, session);
   }, [phone, session]);
 
-  // Refresh button handler
+  // Refresh button
   async function handleRefresh() {
     const latestSession = await loadSessionFromFirestore();
     setSession(latestSession);
-    fetchApprovedOrders(phone, latestSession);
+    fetchAllOrders(phone, latestSession);
   }
-
-  // Determine next upcoming token
-  const nextTokenObj =
-    approvedOrders.find(o => o.token > current) || null;
 
   return (
     <div style={styles.page}>
@@ -180,12 +159,12 @@ export default function TokenStatus() {
         <div style={styles.header}>
           <div>
             <div style={styles.title}>Waffle Lounge — Token Status</div>
-            <div style={styles.subtitle}>Track your approved orders</div>
+            <div style={styles.subtitle}>Track your orders</div>
           </div>
-          <div style={styles.subtitle}>Session: {session || "—"}</div>
+          <div style={styles.smallMuted}>Session: {session || "—"}</div>
         </div>
 
-        {/* Search */}
+        {/* Input */}
         <div style={styles.inputRow}>
           <input
             placeholder="Enter phone number"
@@ -197,63 +176,58 @@ export default function TokenStatus() {
             style={styles.findBtn}
             onClick={() => {
               localStorage.setItem("myPhone", phone);
-              fetchApprovedOrders(phone, session);
+              fetchAllOrders(phone, session);
             }}
           >
             Find
           </button>
         </div>
 
-        {/* LOADING */}
-        {loading && (
-          <div style={{ color: "#bfb39a", textAlign: "center" }}>Loading…</div>
+        {/* Loading */}
+        {loading && <div style={{ color: "#bfb39a", textAlign: "center" }}>Loading…</div>}
+
+        {/* No orders */}
+        {(!loading && orders.length === 0) && (
+          <div style={{ color: "#bfb39a", textAlign: "center", marginTop: 20 }}>
+            No Approved Orders Found
+          </div>
         )}
 
-        {/* NOW SERVING */}
-        <div style={styles.bigPanel}>
-          <div style={styles.nowServing}>NOW SERVING — #{current}</div>
+        {/* Multiple Orders List */}
+        {orders.map(order => (
+          <div key={order.id} style={styles.ticket}>
+            <div style={styles.nowServing}>NOW SERVING — #{current}</div>
 
-          {/* IF NO RECORDS */}
-          {!loading && approvedOrders.length === 0 && (
-            <div style={{ textAlign: "center", color: "#bfb39a", marginTop: 10 }}>
-              No approved orders found.
+            <div style={styles.bigToken}>{order.token}</div>
+
+            <div style={styles.amountBox}>Amount: ₹{Number(order.total ?? 0).toFixed(2)}</div>
+
+            <div style={styles.smallMuted}>
+              Position: {Math.max(0, order.token - current)}
             </div>
-          )}
-
-          {/* ORDERS LIST */}
-          {approvedOrders.map(order => {
-            const isNext = nextTokenObj && order.token === nextTokenObj.token;
-            return (
-              <div
-                key={order.id}
-                style={isNext ? styles.listItemNext : styles.listItem}
-              >
-                <div style={styles.token}>Token #{order.token}</div>
-                <div style={styles.amount}>Amount: ₹{Number(order.total).toFixed(2)}</div>
-              </div>
-            );
-          })}
-        </div>
+          </div>
+        ))}
 
         {/* Buttons */}
-        <div style={styles.actionRow}>
-          <Link href="/">
-            <button style={{ ...styles.btn, ...styles.placeAnother }}>
-              Place Another Order
-            </button>
-          </Link>
+        {orders.length > 0 && (
+          <div style={styles.actionRow}>
+            <Link href="/">
+              <button style={{ ...styles.btn, ...styles.placeAnother }}>
+                Place Another Order
+              </button>
+            </Link>
 
-          <button
-            onClick={handleRefresh}
-            style={{ ...styles.btn, ...styles.refreshBtn }}
-          >
-            Refresh
-          </button>
-        </div>
+            <button
+              onClick={handleRefresh}
+              style={{ ...styles.btn, ...styles.refreshBtn }}
+            >
+              Refresh
+            </button>
+          </div>
+        )}
 
         <Footer />
       </div>
     </div>
   );
 }
-
