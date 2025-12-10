@@ -8,11 +8,51 @@ import { collection, addDoc, doc, getDoc } from "firebase/firestore";
   MENU has small thumbnail images (80x80). You can replace image URLs
   with your own hosted images. Use small thumbnails to keep load low.
 */
+// const MENU = [
+//   { id: "m1", name: "Artisan Coffee", price: 4.5, img: "https://picsum.photos/seed/m1/80/80" },
+//   { id: "m2", name: "Avocado Toast", price: 12,   img: "https://picsum.photos/seed/m2/80/80" },
+//   { id: "m3", name: "Daily Pastry",   price: 5.5, img: "https://picsum.photos/seed/m3/80/80" },
+// ];
+
 const MENU = [
-  { id: "m1", name: "Artisan Coffee", price: 4.5, img: "https://picsum.photos/seed/m1/80/80" },
-  { id: "m2", name: "Avocado Toast", price: 12,   img: "https://picsum.photos/seed/m2/80/80" },
-  { id: "m3", name: "Daily Pastry",   price: 5.5, img: "https://picsum.photos/seed/m3/80/80" },
+  {
+    id: "w1",
+    name: "Classic Belgian Waffle",
+    price: 6.5,
+    img: "https://picsum.photos/seed/waffle1/200/200"
+  },
+  {
+    id: "w2",
+    name: "Chocolate Drizzle Waffle",
+    price: 7.5,
+    img: "https://picsum.photos/seed/waffle2/200/200"
+  },
+  {
+    id: "w3",
+    name: "Strawberry Whipped Waffle",
+    price: 8.0,
+    img: "https://picsum.photos/seed/waffle3/200/200"
+  },
+  {
+    id: "w4",
+    name: "Banana Caramel Waffle",
+    price: 8.5,
+    img: "https://picsum.photos/seed/waffle4/200/200"
+  },
+  {
+    id: "w5",
+    name: "Nutella Loaded Waffle",
+    price: 9.0,
+    img: "https://picsum.photos/seed/waffle5/200/200"
+  },
+  {
+    id: "w6",
+    name: "Blueberry Delight Waffle",
+    price: 8.5,
+    img: "https://picsum.photos/seed/waffle6/200/200"
+  }
 ];
+
 
 const styles = {
   page: {
@@ -146,7 +186,7 @@ export default function Home() {
       <div style={styles.headerRow}>
         <div style={styles.brand}>Waffle Lounge</div>
         <div>
-          <Link href="/staff"><button style={{ ...styles.addBtn, background: "#222", color: "#ffd166" }}>Staff</button></Link>
+          {/* <Link href="/staff"><button style={{ ...styles.addBtn, background: "#222", color: "#ffd166" }}>Staff</button></Link> */}
           {" "}
           <button
             onClick={() => {
@@ -170,7 +210,7 @@ export default function Home() {
                 <img src={item.img} alt={item.name} style={styles.img} />
                 <div style={{ flex: 1 }}>
                   <div style={styles.itemTitle}>{item.name}</div>
-                  <div style={styles.itemPrice}>${item.price.toFixed(2)}</div>
+                  <div style={styles.itemPrice}>Rs.{item.price.toFixed(2)}</div>
                 </div>
                 <div>
                   <button onClick={() => addToCart(item)} style={styles.addBtn}>+ Add</button>
@@ -192,7 +232,7 @@ export default function Home() {
                 <div key={i.id} style={styles.cartRow}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 800 }}>{i.qty} × {i.name}</div>
-                    <div style={{ color: "#bfb39a", fontSize: 13 }}>${(i.qty * i.price).toFixed(2)}</div>
+                    <div style={{ color: "#bfb39a", fontSize: 13 }}>Rs.{(i.qty * i.price).toFixed(2)}</div>
                   </div>
                   <div>
                     <button onClick={() => removeFromCart(i.id)} style={styles.removeBtn}>Remove</button>
@@ -201,7 +241,7 @@ export default function Home() {
               ))}
             </div>
 
-            <div style={{ marginTop: 12, fontWeight: 800, fontSize: 18 }}>Total: ${total.toFixed(2)}</div>
+            <div style={{ marginTop: 12, fontWeight: 800, fontSize: 18 }}>Total: Rs.{total.toFixed(2)}</div>
 
             <form onSubmit={submit} style={styles.checkoutForm}>
               <input style={styles.input} placeholder="Your Name" value={name} onChange={e => setName(e.target.value)} />
