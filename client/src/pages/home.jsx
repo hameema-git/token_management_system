@@ -15,36 +15,64 @@ export default function Home() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
 
+  // // ⭐ Correct session from Firestore
+  // const [session, setSession] = useState("Loading...");
+
+  // // -------------------------------
+  // // Load Active Session from Firestore
+  // // -------------------------------
+  // useEffect(() => {
+  //   async function fetchSession() {
+  //     try {
+  //       const ref = doc(db, "settings", "activeSession");
+  //       const snap = await getDoc(ref);
+
+  //       if (snap.exists()) {
+  //         const active = snap.data().session_id;
+  //         setSession(active);
+
+  //         // store locally for faster next page load
+  //         localStorage.setItem("session", active);
+  //       } else {
+  //         // fallback if Firestore doc missing
+  //         setSession("Session 1");
+  //       }
+  //     } catch (err) {
+  //       console.error("Session load error", err);
+  //       setSession("Session 1");
+  //     }
+  //   }
+
+  //   fetchSession();
+  // }, []);
+
+
   // ⭐ Correct session from Firestore
-  const [session, setSession] = useState("Loading...");
+const [session, setSession] = useState(null);
 
-  // -------------------------------
-  // Load Active Session from Firestore
-  // -------------------------------
-  useEffect(() => {
-    async function fetchSession() {
-      try {
-        const ref = doc(db, "settings", "activeSession");
-        const snap = await getDoc(ref);
+// -------------------------------
+// Load Active Session from Firestore
+// -------------------------------
+useEffect(() => {
+  async function fetchSession() {
+    try {
+      const ref = doc(db, "settings", "activeSession");
+      const snap = await getDoc(ref);
 
-        if (snap.exists()) {
-          const active = snap.data().session_id;
-          setSession(active);
-
-          // store locally for faster next page load
-          localStorage.setItem("session", active);
-        } else {
-          // fallback if Firestore doc missing
-          setSession("Session 1");
-        }
-      } catch (err) {
-        console.error("Session load error", err);
+      if (snap.exists()) {
+        const active = snap.data().session_id;
+        setSession(active);
+      } else {
         setSession("Session 1");
       }
+    } catch (err) {
+      console.error("Session load error", err);
+      setSession("Session 1");
     }
+  }
 
-    fetchSession();
-  }, []);
+  fetchSession();
+}, []);
 
   function addToCart(item) {
     setCart(prev => {
@@ -75,10 +103,13 @@ export default function Home() {
 
     try {
       // ⭐ Always use Firestore session (correct)
-      const session_id =
-        session !== "Loading..."
-          ? session
-          : localStorage.getItem("session") || "Session 1";
+      // const session_id =
+      //   session !== "Loading..."
+      //     ? session
+      //     : localStorage.getItem("session") || "Session 1";
+
+      const session_id = session;
+
 
       const items = cart.map(i => ({
         id: i.id,

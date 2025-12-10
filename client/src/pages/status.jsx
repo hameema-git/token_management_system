@@ -1,75 +1,153 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseInit";
-import { query, collection, where, orderBy, limit, getDocs, doc, getDoc, onSnapshot } from "firebase/firestore";
-import { Link } from "wouter";
-
+import {
+  query,
+  collection,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  doc,
+  getDoc,
+  onSnapshot
+} from "firebase/firestore";
+import { Link, useLocation } from "wouter";
 
 export default function TokenStatus() {
+  const [, setLocation] = useLocation();
+
   const params = new URLSearchParams(window.location.search);
-  const initialPhone = params.get("phone") || localStorage.getItem("myPhone") || "";
+  const initialPhone =
+    params.get("phone") || localStorage.getItem("myPhone") || "";
+
   const [phone, setPhone] = useState(initialPhone);
-  // const [session] = useState(new Date().toISOString().slice(0, 10));
-  const [session] = useState(localStorage.getItem("session") || "Session 1");
+  const [session, setSession] = useState(null);
 
   const [orderInfo, setOrderInfo] = useState(null);
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  // ---------------------------
+  // ⭐ LOAD ACTIVE SESSION FROM FIRESTORE
+  // ---------------------------
+  useEffect(() => {
+    async function loadSession() {
+      try {
+        const ref = doc(db, "settings", "activeSession");
+        const snap = await getDoc(ref);
+
+        if (snap.exists()) setSession(snap.data().session_id);
+        else setSession("Session 1");
+      } catch (err) {
+        console.error("Failed to load session:", err);
+        setSession("Session 1");
+      }
+    }
+
+    loadSession();
+  }, []);
+
+  // ---------------------------
+  // Fetch order for this phone
+  // ---------------------------
   async function fetchMyToken(p) {
-    if (!p) return setOrderInfo(null);
+    if (!p || !session) return;
+
     setLoading(true);
-    const q = query(collection(db, "orders"), where("phone", "==", String(p)), where("session_id", "==", session), orderBy("createdAt", "desc"), limit(1));
+
+    const q = query(
+      collection(db, "orders"),
+      where("phone", "==", String(p)),
+      where("session_id", "==", session),
+      orderBy("createdAt", "desc"),
+      limit(1)
+    );
+
     const snap = await getDocs(q);
+
     if (snap.empty) setOrderInfo(null);
     else setOrderInfo({ id: snap.docs[0].id, ...snap.docs[0].data() });
+
     setLoading(false);
   }
 
+  // ---------------------------
+  // When session or phone changes, refresh data
+  // ---------------------------
   useEffect(() => {
+    if (!session) return; // wait until Firestore session loads
     fetchMyToken(phone);
+
     const tokenDoc = doc(db, "tokens", "session_" + session);
-    const unsub = onSnapshot(tokenDoc, snap => {
-      if (!snap.exists()) { setCurrent(0); return; }
-      setCurrent(snap.data().currentToken || 0);
-    }, err => console.error(err));
+
+    const unsub = onSnapshot(
+      tokenDoc,
+      (snap) => {
+        if (!snap.exists()) setCurrent(0);
+        else setCurrent(snap.data().currentToken || 0);
+      },
+      (err) => console.error(err)
+    );
+
     return () => unsub();
   }, [phone, session]);
 
+  // ---------------------------
+  // UI
+  // ---------------------------
   return (
     <div style={{ padding: 20, maxWidth: 640, margin: "auto" }}>
       <h1>My Token</h1>
 
       <div style={{ marginBottom: 12 }}>
-        <input placeholder="Enter phone" value={phone} onChange={e => setPhone(e.target.value)} />
-        <button onClick={() => { localStorage.setItem("myPhone", phone); fetchMyToken(phone); }}>Find</button>
+        <input
+          placeholder="Enter phone"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+        <button
+          onClick={() => {
+            localStorage.setItem("myPhone", phone);
+            fetchMyToken(phone);
+          }}
+        >
+          Find
+        </button>
       </div>
 
-      {loading && <div>Loading…</div>}
+      {(!session || loading) && <div>Loading…</div>}
 
-      {!loading && (
+      {session && !loading && (
         <div>
           <div>Now Serving: #{current}</div>
-          <div style={{ marginTop: 8 }}>
-            Token: {orderInfo ? (orderInfo.token ?? "Waiting for approval") : "-"}
-          </div>
-          <div>Status: {orderInfo ? orderInfo.status : "-"}</div>
-          <div>
-            Position: {orderInfo && orderInfo.token ? Math.max(0, orderInfo.token - current) : "-"}
-          </div>
-           {/* ⭐ Add this button here */}
-    <Link href="/">
-      <button style={{ marginTop: 20 }}>Place Another Order</button>
-    </Link>
 
-    <button
-  onClick={() => {
-    const ph = localStorage.getItem("myPhone");
-    if (ph) setLocation(`/mytoken?phone=${ph}`);
-  }}
-  style={{ marginTop: 10 }}
->
-  Refresh My Status
-</button>
+          <div style={{ marginTop: 8 }}>
+            Token:{" "}
+            {orderInfo ? orderInfo.token ?? "Waiting for approval" : "-"}
+          </div>
+
+          <div>Status: {orderInfo ? orderInfo.status : "-"}</div>
+
+          <div>
+            Position:{" "}
+            {orderInfo && orderInfo.token
+              ? Math.max(0, orderInfo.token - current)
+              : "-"}
+          </div>
+
+          <Link href="/">
+            <button style={{ marginTop: 20 }}>Place Another Order</button>
+          </Link>
+
+          <button
+            onClick={() => {
+              const ph = localStorage.getItem("myPhone");
+              if (ph) setLocation(`/mytoken?phone=${ph}`);
+            }}
+            style={{ marginTop: 10 }}
+          >
+            Refresh My Status
+          </button>
         </div>
       )}
     </div>
