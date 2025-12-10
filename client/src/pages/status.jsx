@@ -77,7 +77,7 @@ const styles = {
     textAlign: "center"
   },
   bigToken: {
-    fontSize: 64,
+    fontSize: 60,
     fontWeight: 900,
     color: "#ffd166",
     textAlign: "center",
@@ -203,7 +203,7 @@ export default function TokenStatus() {
       const q1 = query(
         collection(db, "orders"),
         where("phone", "==", phoneTrim),
-        orderBy("createdAt", "desc")
+        orderBy("createdAt", "asc")
       );
       const orders = await runQuery(q1);
       if (orders.length > 0) {
