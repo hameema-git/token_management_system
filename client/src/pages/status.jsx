@@ -102,7 +102,7 @@ const styles = {
   placeAnother: { background: "#222", color: "#ffd166", flex: 1 },
   refreshBtn: { background: "#ffd166", color: "#111", flex: 1 },
 
-  // styles for list
+  // list styles
   listContainer: { marginTop: 18 },
   listItem: {
     padding: 12,
@@ -138,8 +138,9 @@ export default function TokenStatus() {
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // New: store all orders for the phone
+  // new states to store all orders and the tokens-only array
   const [allOrders, setAllOrders] = useState([]);
+  const [tokensOnly, setTokensOnly] = useState([]);
 
   // Load active session
   async function loadSessionFromFirestore() {
@@ -164,7 +165,7 @@ export default function TokenStatus() {
     };
   }, []);
 
-  // Fetch the most recent order by phone + session (existing behavior)
+  // The existing single latest-order fetch (keeps your original behaviour)
   async function fetchMyToken(p, sess = session) {
     if (!p || !sess) {
       setOrderInfo(null);
@@ -197,41 +198,146 @@ export default function TokenStatus() {
     }
   }
 
-  // New: fetch all orders for a phone across all sessions (desc by createdAt)
-  async function fetchAllOrdersByPhone(p) {
-    if (!p) {
+  /**
+   * Robust loader that gets ALL orders for a phone:
+   * - tries phone as string with orderBy(createdAt)
+   * - if that fails (createdAt missing), falls back to no-order query and sorts locally
+   * - also tries numeric phone if stored as number
+   */
+  async function loadAllOrdersForPhone(rawPhone) {
+    if (!rawPhone) {
       setAllOrders([]);
+      setTokensOnly([]);
       return;
     }
 
     setLoading(true);
+
+    // helper to run a query and map docs
+    async function runQuery(q) {
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }
+
+    const phoneTrim = String(rawPhone).trim();
+
+    // attempt 1: string with createdAt ordering
     try {
-      const q = query(
+      const q1 = query(
         collection(db, "orders"),
-        where("phone", "==", String(p)),
+        where("phone", "==", phoneTrim),
         orderBy("createdAt", "desc")
       );
-
-      const snap = await getDocs(q);
-      const orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setAllOrders(orders);
+      let orders = await runQuery(q1);
+      if (orders.length > 0) {
+        setAllOrders(orders);
+        setTokensOnly(dedupeTokensPreserveOrder(orders));
+        setLoading(false);
+        return;
+      }
     } catch (err) {
-      console.error("fetchAllOrdersByPhone error:", err);
-      setAllOrders([]);
-    } finally {
-      setLoading(false);
+      // likely some docs missing createdAt or orderBy caused error — continue to fallback
+      console.warn("orderBy(createdAt) failed for string phone, falling back:", err);
     }
+
+    // attempt 2: numeric phone (if digits exist)
+    const numeric = phoneTrim.replace(/\D/g, "");
+    if (numeric) {
+      try {
+        const numVal = Number(numeric);
+        // try with orderBy(createdAt)
+        try {
+          const q2 = query(
+            collection(db, "orders"),
+            where("phone", "==", numVal),
+            orderBy("createdAt", "desc")
+          );
+          const ordersNum = await runQuery(q2);
+          if (ordersNum.length > 0) {
+            setAllOrders(ordersNum);
+            setTokensOnly(dedupeTokensPreserveOrder(ordersNum));
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn("orderBy(createdAt) failed for numeric phone, falling back:", err);
+        }
+
+        // fallback: numeric without orderBy
+        const q3 = query(collection(db, "orders"), where("phone", "==", numVal));
+        const ordersNumPlain = await runQuery(q3);
+        if (ordersNumPlain.length > 0) {
+          const sorted = sortByCreatedAtDesc(ordersNumPlain);
+          setAllOrders(sorted);
+          setTokensOnly(dedupeTokensPreserveOrder(sorted));
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("numeric parse error", err);
+      }
+    }
+
+    // final fallback: string without orderBy
+    try {
+      const q4 = query(collection(db, "orders"), where("phone", "==", phoneTrim));
+      const ordersPlain = await runQuery(q4);
+      if (ordersPlain.length > 0) {
+        const sorted = sortByCreatedAtDesc(ordersPlain);
+        setAllOrders(sorted);
+        setTokensOnly(dedupeTokensPreserveOrder(sorted));
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      console.warn("final fallback error", err);
+    }
+
+    // nothing found
+    setAllOrders([]);
+    setTokensOnly([]);
+    setLoading(false);
   }
 
-  // Subscribe to currentToken updates and refresh order/allOrders when session changes
+  // helper: sort locally by createdAt desc (safe if createdAt missing)
+  function sortByCreatedAtDesc(arr) {
+    return arr.slice().sort((a, b) => {
+      const ta =
+        a.createdAt && typeof a.createdAt.toDate === "function"
+          ? a.createdAt.toDate().getTime()
+          : 0;
+      const tb =
+        b.createdAt && typeof b.createdAt.toDate === "function"
+          ? b.createdAt.toDate().getTime()
+          : 0;
+      return tb - ta;
+    });
+  }
+
+  // helper: dedupe tokens while preserving doc order
+  function dedupeTokensPreserveOrder(orders) {
+    const seen = new Set();
+    const tokens = [];
+    for (const o of orders) {
+      const t = o.token ?? null;
+      if (t === null || t === undefined) continue;
+      if (!seen.has(t)) {
+        seen.add(t);
+        tokens.push(t);
+      }
+    }
+    return tokens;
+  }
+
+  // Subscribe to currentToken updates and refresh order/allOrders when session changes or phone changes
   useEffect(() => {
     if (!session) return;
 
-    // fetch the latest single order for the session
+    // latest single order (existing)
     fetchMyToken(phone, session);
 
-    // fetch all orders for the phone (across sessions)
-    fetchAllOrdersByPhone(phone);
+    // full orders list
+    loadAllOrdersForPhone(phone);
 
     const tokenDoc = doc(db, "tokens", "session_" + session);
 
@@ -245,7 +351,6 @@ export default function TokenStatus() {
     );
 
     return () => unsub();
-    // we intentionally want to re-run when phone or session changes
   }, [phone, session]);
 
   // Manual refresh: reload session, single order and all orders
@@ -253,25 +358,22 @@ export default function TokenStatus() {
     const latestSession = await loadSessionFromFirestore();
     setSession(latestSession);
     fetchMyToken(phone, latestSession);
-    fetchAllOrdersByPhone(phone);
+    loadAllOrdersForPhone(phone);
   }
 
   // When user clicks Find: save phone and fetch
   function handleFindClick() {
     localStorage.setItem("myPhone", phone);
     fetchMyToken(phone, session);
-    fetchAllOrdersByPhone(phone);
+    loadAllOrdersForPhone(phone);
   }
 
   // helper to format Firestore timestamp safely
   function formatTimestamp(ts) {
     try {
       if (!ts) return "";
-      // if it's Firestore Timestamp object
       if (typeof ts.toDate === "function") return ts.toDate().toLocaleString();
-      // if it's already a Date
       if (ts instanceof Date) return ts.toLocaleString();
-      // otherwise return as string
       return String(ts);
     } catch {
       return "";
