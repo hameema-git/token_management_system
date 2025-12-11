@@ -165,7 +165,7 @@ export default function TokenStatus() {
         collection(db, "orders"),
         where("phone", "==", String(p)),
         where("session_id", "==", sess),
-        orderBy("createdAt", "asc"),
+        orderBy("createdAt", "desc"),
         limit(1)
       );
 
@@ -224,7 +224,7 @@ export default function TokenStatus() {
           const q2 = query(
             collection(db, "orders"),
             where("phone", "==", numVal),
-            orderBy("createdAt", "asc")
+            orderBy("createdAt", "desc")
           );
           const ordersNum = await runQuery(q2);
           if (ordersNum.length > 0) {
@@ -467,4 +467,3 @@ export default function TokenStatus() {
     </div>
   );
 }
-
