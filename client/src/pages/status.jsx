@@ -7,7 +7,6 @@ import {
   collection,
   where,
   orderBy,
-  limit,
   getDocs,
   doc,
   getDoc,
@@ -60,6 +59,7 @@ const styles = {
     fontWeight: 800,
     cursor: "pointer"
   },
+
   ticket: {
     marginTop: 12,
     padding: 20,
@@ -67,32 +67,9 @@ const styles = {
     background: "#111",
     borderLeft: "8px solid #ffd166",
     display: "grid",
-    gridTemplateColumns: "1fr",
     gap: 14
   },
-  nowServing: {
-    fontSize: 26,
-    fontWeight: 900,
-    color: "#ffffff",
-    textAlign: "center"
-  },
-  bigToken: {
-    fontSize: 60,
-    fontWeight: 900,
-    color: "#ffd166",
-    textAlign: "center",
-    letterSpacing: 2
-  },
-  amountBox: {
-    fontSize: 24,
-    fontWeight: 900,
-    color: "#ffd166",
-    textAlign: "center",
-    marginTop: 6
-  },
-  smallMuted: { color: "#bfb39a", textAlign: "center", fontSize: 14 },
 
-  // List (simple, clean)
   listContainer: { marginTop: 28 },
   smallHint: { color: "#bfb39a", marginBottom: 8, fontSize: 15 },
   listItem: {
@@ -103,7 +80,6 @@ const styles = {
     marginBottom: 10
   },
   listLine: { fontSize: 16, marginBottom: 4 },
-  bulletItem: { marginLeft: 12, color: "#ffd166", fontSize: 14 },
 
   actionRowBottom: {
     display: "flex",
@@ -125,8 +101,8 @@ const styles = {
 
 export default function TokenStatus() {
   const [, setLocation] = useLocation();
-
   const params = new URLSearchParams(window.location.search);
+
   const initialPhone =
     params.get("phone") || localStorage.getItem("myPhone") || "";
 
@@ -139,12 +115,15 @@ export default function TokenStatus() {
   const [tokensOnly, setTokensOnly] = useState([]);
   const [mainOrder, setMainOrder] = useState(null);
 
+  // HELP POPUP
+  const [showHelp, setShowHelp] = useState(false);
+
+  // Load active session
   async function loadSessionFromFirestore() {
     try {
       const ref = doc(db, "settings", "activeSession");
       const snap = await getDoc(ref);
-      if (snap.exists()) return snap.data().session_id;
-      return "Session 1";
+      return snap.exists() ? snap.data().session_id : "Session 1";
     } catch {
       return "Session 1";
     }
@@ -154,6 +133,7 @@ export default function TokenStatus() {
     loadSessionFromFirestore().then(setSession);
   }, []);
 
+  // Load orders
   async function loadAllOrdersForPhone(rawPhone) {
     if (!rawPhone || !session) return;
 
@@ -170,31 +150,27 @@ export default function TokenStatus() {
     const orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
     if (!orders.length) {
-      setAllOrders([]);
       setTokensOnly([]);
       setMainOrder(null);
+      setAllOrders([]);
       setLoading(false);
       return;
     }
 
-    // sort ascending by token
     const tokens = [...new Set(orders.map((o) => o.token))].sort((a, b) => a - b);
 
     setTokensOnly(tokens);
     setAllOrders(orders);
 
-    // MAIN = smallest token
-    const smallest = tokens[0];
-    const m = orders.find((o) => o.token === smallest);
-    setMainOrder(m);
+    // Main order = smallest token
+    setMainOrder(orders.find((o) => o.token === tokens[0]));
 
     setLoading(false);
   }
 
-  // listen for NOW SERVING
+  // Listen for current token change
   useEffect(() => {
     if (!session) return;
-
     const tokenDoc = doc(db, "tokens", "session_" + session);
 
     return onSnapshot(tokenDoc, (snap) => {
@@ -207,38 +183,25 @@ export default function TokenStatus() {
     loadAllOrdersForPhone(phone);
   }
 
-  async function handleRefresh() {
+  function handleRefresh() {
     loadAllOrdersForPhone(phone);
-  }
-
-  function renderItems(items) {
-    if (!items || !items.length) return null;
-
-    return (
-      <div>
-        <div style={{ fontSize: 14, marginBottom: 4 }}>Items:</div>
-        {items.map((it, idx) => (
-          <div key={idx} style={styles.bulletItem}>
-            • {it.name} × {it.quantity}
-          </div>
-        ))}
-      </div>
-    );
   }
 
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        {/* HEADER SESSION */}
+
+        {/* Header */}
         <div style={styles.header}>
           <div>
             <div style={styles.title}>Waffle Lounge — Token Status</div>
             <div style={styles.subtitle}>Track your order quickly</div>
           </div>
+
           <div style={styles.smallMuted}>Session: {session || "—"}</div>
         </div>
 
-        {/* Search box */}
+        {/* Search */}
         <div style={styles.inputRow}>
           <input
             placeholder="Enter phone number"
@@ -257,81 +220,57 @@ export default function TokenStatus() {
         )}
 
         {/* MAIN CARD */}
-        {/* {mainOrder && !loading && (
-          <div style={styles.ticket}>
-            <div style={styles.nowServing}>NOW SERVING — #{current}</div>
-
-            <div style={styles.bigToken}>{mainOrder.token}</div>
-
-            <div style={styles.amountBox}>
-              Amount: ₹{Number(mainOrder.total || 0).toFixed(2)}
-            </div>
-
-            <div style={styles.smallMuted}>
-              Position: {Math.max(0, mainOrder.token - current)}
-            </div>
-
-            {renderItems(mainOrder.items)}
-          </div>
-        )} */}
         {mainOrder && !loading && (
-  <div style={styles.ticket}>
+          <div style={styles.ticket}>
+            <div
+              style={{
+                fontSize: 70,
+                fontWeight: 900,
+                color: "#ffd166",
+                textAlign: "center",
+                marginBottom: 10
+              }}
+            >
+              TOKEN {mainOrder.token}
+            </div>
 
-    {/* TOKEN NUMBER FIRST (highlighted) */}
-    <div style={{ 
-      fontSize: 70,
-      fontWeight: 900,
-      color: "#ffd166",
-      textAlign: "center",
-      marginBottom: 10,
-      letterSpacing: 2
-    }}>
-      #{mainOrder.token}
-    </div>
+            <div
+              style={{
+                fontSize: 26,
+                fontWeight: 800,
+                color: "#ffd166",
+                textAlign: "center"
+              }}
+            >
+              Amount: ₹{Number(mainOrder.total).toFixed(2)}
+            </div>
 
-    {/* AMOUNT */}
-    <div style={{
-      fontSize: 26,
-      fontWeight: 800,
-      color: "#ffd166",
-      textAlign: "center",
-      marginBottom: 10
-    }}>
-      Amount: ₹{Number(mainOrder.total || 0).toFixed(2)}
-    </div>
+            <div
+              style={{
+                fontSize: 24,
+                fontWeight: 900,
+                color: "#fff",
+                textAlign: "center"
+              }}
+            >
+              NOW SERVING — {current}
+            </div>
 
-    {/* NOW SERVING */}
-    <div style={{
-      fontSize: 24,
-      fontWeight: 900,
-      color: "#ffffff",
-      textAlign: "center",
-      marginBottom: 8
-    }}>
-      NOW SERVING — #{current}
-    </div>
+            <div
+              style={{
+                color: "#ffd166",
+                textAlign: "center",
+                fontSize: 22,
+                fontWeight: 800
+              }}
+            >
+              Position: {mainOrder.token - current}
+            </div>
+          </div>
+        )}
 
-    {/* POSITION */}
-    <div style={{
-      color: "#bfb39a",
-      textAlign: "center",
-      fontSize: 16,
-      marginBottom: 12
-    }}>
-      Position: {Math.max(0, mainOrder.token - current)}
-    </div>
-
-    {/* ITEMS ORDERED */}
-    <div style={{ marginTop: 10 }}>
-      {renderItems(mainOrder.items)}
-    </div>
-
-  </div>
-)}
-
-
-        {/* OTHER TOKENS LIST */}
-        {/* {tokensOnly.length > 1 && (
+        {/* OTHER TOKENS */}
+        {tokensOnly.length > 1 && (
           <div style={styles.listContainer}>
             <div style={styles.smallHint}>Your other tokens</div>
 
@@ -341,62 +280,33 @@ export default function TokenStatus() {
 
               return (
                 <div key={tk} style={styles.listItem}>
-                  <div style={styles.listLine}>Token {tk}
-                  
-                    Position: {Math.max(0, tk - current)}
-                  </div>
-                  <div style={styles.listLine}>
-                    Amount: ₹{Number(order.total).toFixed(2)}
+                  <div
+                    style={{
+                      ...styles.listLine,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontWeight: 700
+                    }}
+                  >
+                    <span>Token {tk}</span>
+                    <span>Position: {tk - current}</span>
                   </div>
 
-                  {renderItems(order.items)}
+                  <div
+                    style={{
+                      ...styles.listLine,
+                      marginTop: 6,
+                      fontWeight: 700,
+                      color: "#ffd166"
+                    }}
+                  >
+                    Amount: ₹{Number(order.total).toFixed(2)}
+                  </div>
                 </div>
               );
             })}
           </div>
-        )} */}
-{tokensOnly.length > 1 && (
-  <div style={styles.listContainer}>
-    <div style={styles.smallHint}>Your other tokens</div>
-
-    {tokensOnly.slice(1).map((tk) => {
-      const order = allOrders.find((o) => o.token === tk);
-      if (!order) return null;
-
-      return (
-        <div key={tk} style={styles.listItem}>
-
-          {/* TOKEN + POSITION (same line) */}
-          <div style={{
-            ...styles.listLine,
-            display: "flex",
-            justifyContent: "space-between",
-            fontWeight: 700
-          }}>
-            <span>Token #{tk}</span>
-            <span>Position: {Math.max(0, tk - current)}</span>
-          </div>
-
-          {/* ITEMS ORDERED */}
-          <div style={{ marginTop: 6 }}>
-            {renderItems(order.items)}
-          </div>
-
-          {/* AMOUNT */}
-          <div style={{
-            ...styles.listLine,
-            marginTop: 6,
-            fontWeight: 700,
-            color: "#ffd166"
-          }}>
-            Amount: ₹{Number(order.total).toFixed(2)}
-          </div>
-
-        </div>
-      );
-    })}
-  </div>
-)}
+        )}
 
         {/* BOTTOM BUTTONS */}
         <div style={styles.actionRowBottom}>
@@ -412,10 +322,78 @@ export default function TokenStatus() {
           >
             Refresh
           </button>
+
+          {/* HELP BUTTON */}
+          <button
+            style={{
+              ...styles.btn,
+              background: "#333",
+              color: "#ffd166"
+            }}
+            onClick={() => setShowHelp(true)}
+          >
+            Rules
+          </button>
         </div>
 
         <Footer />
       </div>
+
+      {/* HELP POPUP */}
+      {showHelp && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 999
+          }}
+        >
+          <div
+            style={{
+              background: "#111",
+              padding: 20,
+              borderRadius: 10,
+              width: "90%",
+              maxWidth: 400,
+              border: "2px solid #ffd166"
+            }}
+          >
+            <h3 style={{ color: "#ffd166" }}>Token Rules</h3>
+
+            <div style={{ fontSize: 14, lineHeight: 1.6 }}>
+              • <b>Token</b> — Your order number<br />
+              • <b>Now Serving</b> — Token staff is preparing<br />
+              • <b>Position</b> — Tokens before you<br />
+              • <b>Negative Position</b> — You were called but missed<br />
+              • (-2 served before -1)<br />
+              • Passed tokens are served only after the current customer
+            </div>
+
+            <button
+              onClick={() => setShowHelp(false)}
+              style={{
+                marginTop: 15,
+                width: "100%",
+                padding: "10px 12px",
+                background: "#ffd166",
+                color: "#111",
+                borderRadius: 8,
+                border: "none",
+                fontWeight: 800
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
