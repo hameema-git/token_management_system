@@ -420,7 +420,7 @@ export default function TokenStatus() {
 
               <div style={styles.smallMuted}>
                 {orderInfo && orderInfo.token
-                  ? `Position: ${Math.max(0, orderInfo.token - current)}`
+                  ? `Position: ${Math.min(0, orderInfo.token - current)}`
                   : ""}
               </div>
             </div>
@@ -451,7 +451,9 @@ export default function TokenStatus() {
               {/* tokensOnly is an array of token values sorted ascending.
                   For each token, find the first order doc that has that token (prefer newer one).
                   This keeps ticket details (amount, session, createdAt) meaningful. */}
-              {tokensOnly.map((tk) => {
+              {/* {tokensOnly.map((tk) => { */}
+              {tokensOnly.slice(1).map((tk) => {
+
                 // find the first matching order in allOrders (orders are newest->oldest)
                 const match = allOrders.find((o) => String(o.token) === String(tk));
                 // If no matching order doc found (shouldn't happen), create a minimal object
