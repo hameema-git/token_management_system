@@ -367,14 +367,15 @@ export default function TokenStatus() {
           >
             <h3 style={{ color: "#ffd166" }}>Token Rules</h3>
 
-            <div style={{ fontSize: 14, lineHeight: 1.6 }}>
-              • <b>Token</b> — Your order number<br />
-              • <b>Now Serving</b> — Token staff is preparing<br />
-              • <b>Position</b> — Tokens before you<br />
-              • <b>Negative Position</b> — You were called but missed<br />
-              • (-2 served before -1)<br />
-              • Passed tokens are served only after the current customer
-            </div>
+           <div style={{ fontSize: 14, lineHeight: 1.6 }}>
+  • <b>Token</b> — Your order number<br />
+  • <b>Now Serving</b> — The token the staff is currently preparing<br />
+  • <b>Position</b> — How many tokens are ahead of you  
+      (If Position = <b>0</b>, please go to the counter now)<br />
+  • <b>Negative Position</b> — You were called but not present  
+      (Example: -2 is served before -1)<br />
+  • Missed tokens are served only after the current customer
+</div>
 
             <button
               onClick={() => setShowHelp(false)}
