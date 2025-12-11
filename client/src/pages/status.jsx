@@ -369,7 +369,7 @@ export default function TokenStatus() {
         </div>
 
         <div style={styles.smallMuted}>
-          {order.token ? `Position: ${Math.max(0, order.token - current)}` : ""}
+          {order.token ? `Position: ${Math.min(0, order.token - current)}` : ""}
         </div>
       </div>
     );
