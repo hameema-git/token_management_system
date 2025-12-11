@@ -257,7 +257,7 @@ export default function TokenStatus() {
         )}
 
         {/* MAIN CARD */}
-        {mainOrder && !loading && (
+        {/* {mainOrder && !loading && (
           <div style={styles.ticket}>
             <div style={styles.nowServing}>NOW SERVING — #{current}</div>
 
@@ -273,10 +273,65 @@ export default function TokenStatus() {
 
             {renderItems(mainOrder.items)}
           </div>
-        )}
+        )} */}
+        {mainOrder && !loading && (
+  <div style={styles.ticket}>
+
+    {/* TOKEN NUMBER FIRST (highlighted) */}
+    <div style={{ 
+      fontSize: 70,
+      fontWeight: 900,
+      color: "#ffd166",
+      textAlign: "center",
+      marginBottom: 10,
+      letterSpacing: 2
+    }}>
+      #{mainOrder.token}
+    </div>
+
+    {/* AMOUNT */}
+    <div style={{
+      fontSize: 26,
+      fontWeight: 800,
+      color: "#ffd166",
+      textAlign: "center",
+      marginBottom: 10
+    }}>
+      Amount: ₹{Number(mainOrder.total || 0).toFixed(2)}
+    </div>
+
+    {/* NOW SERVING */}
+    <div style={{
+      fontSize: 24,
+      fontWeight: 900,
+      color: "#ffffff",
+      textAlign: "center",
+      marginBottom: 8
+    }}>
+      NOW SERVING — #{current}
+    </div>
+
+    {/* POSITION */}
+    <div style={{
+      color: "#bfb39a",
+      textAlign: "center",
+      fontSize: 16,
+      marginBottom: 12
+    }}>
+      Position: {Math.max(0, mainOrder.token - current)}
+    </div>
+
+    {/* ITEMS ORDERED */}
+    <div style={{ marginTop: 10 }}>
+      {renderItems(mainOrder.items)}
+    </div>
+
+  </div>
+)}
+
 
         {/* OTHER TOKENS LIST */}
-        {tokensOnly.length > 1 && (
+        {/* {tokensOnly.length > 1 && (
           <div style={styles.listContainer}>
             <div style={styles.smallHint}>Your other tokens</div>
 
@@ -286,8 +341,8 @@ export default function TokenStatus() {
 
               return (
                 <div key={tk} style={styles.listItem}>
-                  <div style={styles.listLine}>Token #{tk}</div>
-                  <div style={styles.listLine}>
+                  <div style={styles.listLine}>Token {tk}
+                  
                     Position: {Math.max(0, tk - current)}
                   </div>
                   <div style={styles.listLine}>
@@ -299,7 +354,49 @@ export default function TokenStatus() {
               );
             })}
           </div>
-        )}
+        )} */}
+{tokensOnly.length > 1 && (
+  <div style={styles.listContainer}>
+    <div style={styles.smallHint}>Your other tokens</div>
+
+    {tokensOnly.slice(1).map((tk) => {
+      const order = allOrders.find((o) => o.token === tk);
+      if (!order) return null;
+
+      return (
+        <div key={tk} style={styles.listItem}>
+
+          {/* TOKEN + POSITION (same line) */}
+          <div style={{
+            ...styles.listLine,
+            display: "flex",
+            justifyContent: "space-between",
+            fontWeight: 700
+          }}>
+            <span>Token #{tk}</span>
+            <span>Position: {Math.max(0, tk - current)}</span>
+          </div>
+
+          {/* ITEMS ORDERED */}
+          <div style={{ marginTop: 6 }}>
+            {renderItems(order.items)}
+          </div>
+
+          {/* AMOUNT */}
+          <div style={{
+            ...styles.listLine,
+            marginTop: 6,
+            fontWeight: 700,
+            color: "#ffd166"
+          }}>
+            Amount: ₹{Number(order.total).toFixed(2)}
+          </div>
+
+        </div>
+      );
+    })}
+  </div>
+)}
 
         {/* BOTTOM BUTTONS */}
         <div style={styles.actionRowBottom}>
