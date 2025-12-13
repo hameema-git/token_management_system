@@ -203,6 +203,119 @@ export default function Home() {
         </div>
       )}
 
+      {/* ---------------- CART DRAWER ---------------- */}
+{cartOpen && (
+  <div style={ui.overlay} onClick={() => setCartOpen(false)}>
+    <div
+      style={{
+        position: "fixed",
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: "100%",
+        maxWidth: 420,
+        background: "#0f0f0f",
+        display: "flex",
+        flexDirection: "column"
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* HEADER */}
+      <div style={{ padding: 16, borderBottom: "1px solid #222", display: "flex", justifyContent: "space-between" }}>
+        <h3 style={{ margin: 0 }}>Your Cart</h3>
+        <button onClick={() => setCartOpen(false)} style={{ background: "none", color: "#fff", border: "none", fontSize: 20 }}>✕</button>
+      </div>
+
+      {/* BODY */}
+      <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+        {cart.length === 0 && (
+          <div style={{ color: "#bfb39a", textAlign: "center" }}>
+            Cart is empty
+          </div>
+        )}
+
+        {cart.map(i => (
+          <div
+            key={i.id}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto auto",
+              gap: 12,
+              alignItems: "center",
+              marginBottom: 14
+            }}
+          >
+            <div>
+              <b>{i.name}</b>
+              <div>₹{i.price * i.qty}</div>
+            </div>
+
+            <div>
+              <button
+                style={{ background: "#222", color: "#ffd166", border: "none", padding: "6px 10px", borderRadius: 6 }}
+                onClick={() => setCart(c =>
+                  c.map(x => x.id === i.id ? { ...x, qty: x.qty - 1 } : x).filter(x => x.qty > 0)
+                )}
+              >−</button>
+
+              <span style={{ margin: "0 8px" }}>{i.qty}</span>
+
+              <button
+                style={{ background: "#222", color: "#ffd166", border: "none", padding: "6px 10px", borderRadius: 6 }}
+                onClick={() => setCart(c =>
+                  c.map(x => x.id === i.id ? { ...x, qty: x.qty + 1 } : x)
+                )}
+              >+</button>
+            </div>
+
+            <button
+              style={{ background: "#441111", color: "#ff9b9b", border: "none", padding: "6px 10px", borderRadius: 6 }}
+              onClick={() => setCart(c => c.filter(x => x.id !== i.id))}
+            >✕</button>
+          </div>
+        ))}
+      </div>
+
+      {/* FOOTER */}
+      <div style={{ padding: 16, borderTop: "1px solid #222" }}>
+        <input
+          placeholder="Your Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{ width: "100%", padding: 12, marginBottom: 10, borderRadius: 8, background: "#111", color: "#fff", border: "1px solid #222" }}
+        />
+        <input
+          placeholder="Phone Number"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          style={{ width: "100%", padding: 12, marginBottom: 10, borderRadius: 8, background: "#111", color: "#fff", border: "1px solid #222" }}
+        />
+
+        <div style={{ fontWeight: 900, marginBottom: 10 }}>
+          Total: ₹{total}
+        </div>
+
+        <button
+          disabled={!canSubmit}
+          onClick={submit}
+          style={{
+            width: "100%",
+            padding: 14,
+            background: "#ffd166",
+            border: "none",
+            borderRadius: 10,
+            fontWeight: 900,
+            opacity: canSubmit ? 1 : 0.4
+          }}
+        >
+          Place Order
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
       <Footer />
     </div>
   );
