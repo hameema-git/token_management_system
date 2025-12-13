@@ -144,7 +144,8 @@ export default function Home() {
       phone,
       items: cart,
       total,
-      status: "pending"
+      status: "pending",
+      session_id: session
     });
     localStorage.setItem("myPhone", phone);
     setLocation(`/mytoken?phone=${phone}`);
