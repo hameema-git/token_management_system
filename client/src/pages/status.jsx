@@ -1,5 +1,4 @@
 // client/src/pages/status.jsx
-
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseInit";
 import {
@@ -32,12 +31,12 @@ const styles = {
   },
   title: { fontSize: 22, fontWeight: 900, color: "#ffd166" },
   subtitle: { color: "#bfb39a", fontSize: 13 },
+
   inputRow: {
     background: "#111",
     padding: 14,
     borderRadius: 10,
-    marginBottom: 18,
-    border: "1px solid rgba(255,209,102,0.05)"
+    marginBottom: 18
   },
   input: {
     width: "100%",
@@ -46,7 +45,6 @@ const styles = {
     border: "1px solid #222",
     background: "#0c0c0c",
     color: "#fff",
-    boxSizing: "border-box",
     fontSize: 15
   },
   findBtn: {
@@ -70,8 +68,16 @@ const styles = {
     gap: 14
   },
 
+  completedCard: {
+    marginTop: 20,
+    padding: 22,
+    borderRadius: 12,
+    background: "#111",
+    borderLeft: "8px solid #2ecc71",
+    textAlign: "center"
+  },
+
   listContainer: { marginTop: 28 },
-  smallHint: { color: "#bfb39a", marginBottom: 8, fontSize: 15 },
   listItem: {
     background: "#111",
     padding: "12px 14px",
@@ -79,7 +85,6 @@ const styles = {
     borderLeft: "4px solid #444",
     marginBottom: 10
   },
-  listLine: { fontSize: 16, marginBottom: 4 },
 
   actionRowBottom: {
     display: "flex",
@@ -111,82 +116,66 @@ export default function TokenStatus() {
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const [allOrders, setAllOrders] = useState([]);
-  const [tokensOnly, setTokensOnly] = useState([]);
-  const [mainOrder, setMainOrder] = useState(null);
+  const [activeOrders, setActiveOrders] = useState([]);
+  const [completedOrders, setCompletedOrders] = useState([]);
 
-  // HELP POPUP
-  const [showHelp, setShowHelp] = useState(false);
-
-  // Load active session
-  async function loadSessionFromFirestore() {
-    try {
-      const ref = doc(db, "settings", "activeSession");
-      const snap = await getDoc(ref);
-      return snap.exists() ? snap.data().session_id : "Session 1";
-    } catch {
-      return "Session 1";
-    }
+  /* ---------------- Load active session ---------------- */
+  async function loadSession() {
+    const ref = doc(db, "settings", "activeSession");
+    const snap = await getDoc(ref);
+    setSession(snap.exists() ? snap.data().session_id : "Session 1");
   }
 
   useEffect(() => {
-    loadSessionFromFirestore().then(setSession);
+    loadSession();
   }, []);
 
-  // Load orders
-  async function loadAllOrdersForPhone(rawPhone) {
-    if (!rawPhone || !session) return;
+  /* ---------------- Listen current token ---------------- */
+  useEffect(() => {
+    if (!session) return;
+    const tokenRef = doc(db, "tokens", "session_" + session);
+    return onSnapshot(tokenRef, (snap) => {
+      if (snap.exists()) setCurrent(snap.data().currentToken || 0);
+    });
+  }, [session]);
+
+  /* ---------------- Load Orders ---------------- */
+  async function loadOrders() {
+    if (!phone || !session) return;
 
     setLoading(true);
 
     const q = query(
       collection(db, "orders"),
-      where("phone", "==", String(rawPhone)),
+      where("phone", "==", String(phone)),
       where("session_id", "==", session),
       orderBy("createdAt", "asc")
     );
 
     const snap = await getDocs(q);
-    const orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    if (!orders.length) {
-      setTokensOnly([]);
-      setMainOrder(null);
-      setAllOrders([]);
-      setLoading(false);
-      return;
-    }
-
-    const tokens = [...new Set(orders.map((o) => o.token))].sort((a, b) => a - b);
-
-    setTokensOnly(tokens);
-    setAllOrders(orders);
-
-    // Main order = smallest token
-    setMainOrder(orders.find((o) => o.token === tokens[0]));
+    setActiveOrders(all.filter(o => o.status !== "completed"));
+    setCompletedOrders(all.filter(o => o.status === "completed"));
 
     setLoading(false);
   }
 
-  // Listen for current token change
-  useEffect(() => {
-    if (!session) return;
-    const tokenDoc = doc(db, "tokens", "session_" + session);
-
-    return onSnapshot(tokenDoc, (snap) => {
-      if (snap.exists()) setCurrent(snap.data().currentToken || 0);
-    });
-  }, [session]);
-
-  function handleFindClick() {
+  function handleFind() {
     localStorage.setItem("myPhone", phone);
-    loadAllOrdersForPhone(phone);
+    loadOrders();
   }
 
   function handleRefresh() {
-    loadAllOrdersForPhone(phone);
+    loadOrders();
   }
 
+  const mainOrder =
+    activeOrders.length > 0
+      ? activeOrders.sort((a, b) => a.token - b.token)[0]
+      : null;
+
+  /* ---------------- RENDER ---------------- */
   return (
     <div style={styles.page}>
       <div style={styles.container}>
@@ -195,10 +184,9 @@ export default function TokenStatus() {
         <div style={styles.header}>
           <div>
             <div style={styles.title}>Waffle Lounge — Token Status</div>
-            <div style={styles.subtitle}>Track your order quickly</div>
+            <div style={styles.subtitle}>Track your order</div>
           </div>
-
-          <div style={styles.smallMuted}>Session: {session || "—"}</div>
+          <div style={styles.subtitle}>Session: {session || "-"}</div>
         </div>
 
         {/* Search */}
@@ -209,106 +197,53 @@ export default function TokenStatus() {
             onChange={(e) => setPhone(e.target.value)}
             style={styles.input}
           />
-
-          <button style={styles.findBtn} onClick={handleFindClick}>
+          <button style={styles.findBtn} onClick={handleFind}>
             Find
           </button>
         </div>
 
-        {loading && (
-          <div style={{ color: "#bfb39a", textAlign: "center" }}>Loading…</div>
-        )}
+        {/* LOADING */}
+        {loading && <div style={{ textAlign: "center" }}>Loading…</div>}
 
-        {/* MAIN CARD */}
-        {mainOrder && !loading && (
+        {/* ACTIVE TOKEN CARD */}
+        {mainOrder && (
           <div style={styles.ticket}>
-            <div
-              style={{
-                fontSize: 70,
-                fontWeight: 900,
-                color: "#ffd166",
-                textAlign: "center",
-                marginBottom: 10
-              }}
-            >
+            <div style={{ fontSize: 64, fontWeight: 900, textAlign: "center" }}>
               TOKEN {mainOrder.token}
             </div>
 
-            <div
-              style={{
-                fontSize: 26,
-                fontWeight: 800,
-                color: "#ffd166",
-                textAlign: "center"
-              }}
-            >
+            <div style={{ fontSize: 22, fontWeight: 800, textAlign: "center" }}>
               Amount: ₹{Number(mainOrder.total).toFixed(2)}
             </div>
 
-            <div
-              style={{
-                fontSize: 24,
-                fontWeight: 900,
-                color: "#fff",
-                textAlign: "center"
-              }}
-            >
-              NOW SERVING — {current}
+            <div style={{ fontSize: 22, fontWeight: 900, textAlign: "center" }}>
+              NOW SERVING — {current || "-"}
             </div>
 
-            <div
-              style={{
-                color: "#ffd166",
-                textAlign: "center",
-                fontSize: 22,
-                fontWeight: 800
-              }}
-            >
+            <div style={{ fontSize: 20, fontWeight: 800, textAlign: "center" }}>
               Position: {mainOrder.token - current}
             </div>
           </div>
         )}
 
-        {/* OTHER TOKENS */}
-        {tokensOnly.length > 1 && (
-          <div style={styles.listContainer}>
-            <div style={styles.smallHint}>Your other tokens</div>
+        {/* COMPLETED STATE */}
+        {!mainOrder && completedOrders.length > 0 && (
+          <div style={styles.completedCard}>
+            <div style={{ fontSize: 26, fontWeight: 900, color: "#2ecc71" }}>
+              ✅ Order Completed
+            </div>
 
-            {tokensOnly.slice(1).map((tk) => {
-              const order = allOrders.find((o) => o.token === tk);
-              if (!order) return null;
+            <div style={{ marginTop: 10, fontSize: 18 }}>
+              Please collect your order at the counter
+            </div>
 
-              return (
-                <div key={tk} style={styles.listItem}>
-                  <div
-                    style={{
-                      ...styles.listLine,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontWeight: 700
-                    }}
-                  >
-                    <span>Token {tk}</span>
-                    <span>Position: {tk - current}</span>
-                  </div>
-
-                  <div
-                    style={{
-                      ...styles.listLine,
-                      marginTop: 6,
-                      fontWeight: 700,
-                      color: "#ffd166"
-                    }}
-                  >
-                    Amount: ₹{Number(order.total).toFixed(2)}
-                  </div>
-                </div>
-              );
-            })}
+            <div style={{ marginTop: 12, color: "#bfb39a" }}>
+              Thank you for visiting Waffle Lounge 🍰
+            </div>
           </div>
         )}
 
-        {/* BOTTOM BUTTONS */}
+        {/* ACTION BUTTONS */}
         <div style={styles.actionRowBottom}>
           <Link href="/">
             <button style={{ ...styles.btn, ...styles.placeAnother }}>
@@ -322,79 +257,10 @@ export default function TokenStatus() {
           >
             Refresh
           </button>
-
-          {/* HELP BUTTON */}
-          <button
-            style={{
-              ...styles.btn,
-              background: "#333",
-              color: "#ffd166"
-            }}
-            onClick={() => setShowHelp(true)}
-          >
-            Rules
-          </button>
         </div>
 
         <Footer />
       </div>
-
-      {/* HELP POPUP */}
-      {showHelp && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.7)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 999
-          }}
-        >
-          <div
-            style={{
-              background: "#111",
-              padding: 20,
-              borderRadius: 10,
-              width: "90%",
-              maxWidth: 400,
-              border: "2px solid #ffd166"
-            }}
-          >
-            <h3 style={{ color: "#ffd166" }}>Token Rules</h3>
-
-           <div style={{ fontSize: 14, lineHeight: 1.6 }}>
-  • <b>Token</b> — Your order number<br />
-  • <b>Now Serving</b> — The token the staff is currently preparing<br />
-  • <b>Position</b> — How many tokens are ahead of you  
-      (If Position = <b>0</b>, please go to the counter now)<br />
-  • <b>Negative Position</b> — You were called but not present  
-      (Example: -2 is served before -1)<br />
-  • Missed tokens are served only after the current customer
-</div>
-
-            <button
-              onClick={() => setShowHelp(false)}
-              style={{
-                marginTop: 15,
-                width: "100%",
-                padding: "10px 12px",
-                background: "#ffd166",
-                color: "#111",
-                borderRadius: 8,
-                border: "none",
-                fontWeight: 800
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
