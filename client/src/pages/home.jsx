@@ -1,4 +1,3 @@
-// client/src/pages/home.jsx
 import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { db, serverTimestamp } from "../firebaseInit";
@@ -7,41 +6,11 @@ import Footer from "../components/Footer";
 
 /* ---------------- MENU ---------------- */
 const MENU = [
-  {
-    id: "w1",
-    name: "Classic Belgian Waffle",
-    price: 100,
-    img: "/images/waffle1.jpeg",
-    desc: "Crispy outside, soft inside. Authentic Belgian-style waffle made fresh."
-  },
-  {
-    id: "w2",
-    name: "Strawberry Cream Waffle",
-    price: 150,
-    img: "/images/waffle2.jpeg",
-    desc: "Fresh strawberries with smooth whipped cream on a golden waffle."
-  },
-  {
-    id: "w3",
-    name: "Nutella Chocolate Waffle",
-    price: 180,
-    img: "/images/waffle3.jpeg",
-    desc: "Loaded with rich Nutella and chocolate drizzle. Customer favourite!"
-  },
-  {
-    id: "w4",
-    name: "Banana Caramel Waffle",
-    price: 150,
-    img: "/images/waffle4.jpeg",
-    desc: "Caramelized bananas with warm caramel sauce."
-  },
-  {
-    id: "w5",
-    name: "Blueberry Bliss Waffle",
-    price: 180,
-    img: "/images/waffle5.jpeg",
-    desc: "Juicy blueberries with a hint of sweetness and crunch."
-  }
+  { id: "w1", name: "Classic Belgian Waffle", price: 100, img: "/images/waffle1.jpeg" },
+  { id: "w2", name: "Strawberry Cream Waffle", price: 150, img: "/images/waffle2.jpeg" },
+  { id: "w3", name: "Nutella Chocolate Waffle", price: 180, img: "/images/waffle3.jpeg" },
+  { id: "w4", name: "Banana Caramel Waffle", price: 150, img: "/images/waffle4.jpeg" },
+  { id: "w5", name: "Blueberry Bliss Waffle", price: 180, img: "/images/waffle5.jpeg" }
 ];
 
 /* ---------------- STYLES ---------------- */
@@ -61,7 +30,11 @@ const ui = {
     marginBottom: 16
   },
 
-  brand: { fontSize: 26, fontWeight: 900, color: "#ffd166" },
+  brand: {
+    fontSize: 26,
+    fontWeight: 900,
+    color: "#ffd166"
+  },
 
   tokenBtn: {
     background: "transparent",
@@ -73,6 +46,29 @@ const ui = {
     cursor: "pointer"
   },
 
+  cartBtn: {
+    background: "#222",
+    color: "#ffd166",
+    border: "1px solid #ffd166",
+    padding: "8px 14px",
+    borderRadius: 20,
+    fontWeight: 800,
+    cursor: "pointer",
+    position: "relative"
+  },
+
+  badge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    background: "#e63946",
+    color: "#fff",
+    fontSize: 12,
+    padding: "2px 6px",
+    borderRadius: 20,
+    fontWeight: 900
+  },
+
   menuGrid: { display: "grid", gap: 14 },
 
   card: {
@@ -81,11 +77,15 @@ const ui = {
     padding: 12,
     background: "#111",
     borderRadius: 12,
-    alignItems: "center",
-    cursor: "pointer"
+    alignItems: "center"
   },
 
-  img: { width: 80, height: 80, borderRadius: 10, objectFit: "cover" },
+  img: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    objectFit: "cover"
+  },
 
   addBtn: {
     background: "#ffd166",
@@ -96,36 +96,11 @@ const ui = {
     cursor: "pointer"
   },
 
-  floatingCart: {
-    position: "fixed",
-    top: 16,
-    right: 16,
-    background: "linear-gradient(135deg, #550a0a, #8b0f12)",
-    color: "#fff",
-    border: "none",
-    padding: "10px 16px",
-    borderRadius: 30,
-    fontWeight: 900,
-    cursor: "pointer",
-    zIndex: 1000
-  },
-
   overlay: {
     position: "fixed",
     inset: 0,
     background: "rgba(0,0,0,.6)",
-    zIndex: 999,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center"
-  },
-
-  modal: {
-    background: "#111",
-    padding: 16,
-    borderRadius: 14,
-    width: "90%",
-    maxWidth: 420
+    zIndex: 999
   },
 
   drawer: {
@@ -144,12 +119,20 @@ const ui = {
     padding: 16,
     borderBottom: "1px solid #222",
     display: "flex",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    alignItems: "center"
   },
 
-  drawerBody: { flex: 1, overflowY: "auto", padding: 16 },
+  drawerBody: {
+    flex: 1,
+    overflowY: "auto",
+    padding: 16
+  },
 
-  drawerFooter: { padding: 16, borderTop: "1px solid #222" },
+  drawerFooter: {
+    padding: 16,
+    borderTop: "1px solid #222"
+  },
 
   cartRow: {
     display: "grid",
@@ -193,18 +176,16 @@ const ui = {
     background: "#ffd166",
     border: "none",
     borderRadius: 10,
-    fontWeight: 900
+    fontWeight: 900,
+    cursor: "pointer"
   }
 };
 
 /* ---------------- COMPONENT ---------------- */
 export default function Home() {
   const [, setLocation] = useLocation();
-
   const [cart, setCart] = useState([]);
   const [open, setOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [session, setSession] = useState("Session 1");
@@ -220,12 +201,11 @@ export default function Home() {
   }, []);
 
   function add(item) {
-    setCart(c => {
-      const f = c.find(x => x.id === item.id);
-      return f
+    setCart(c =>
+      c.find(x => x.id === item.id)
         ? c.map(x => x.id === item.id ? { ...x, qty: x.qty + 1 } : x)
-        : [...c, { ...item, qty: 1 }];
-    });
+        : [...c, { ...item, qty: 1 }]
+    );
   }
 
   function updateQty(id, d) {
@@ -270,81 +250,44 @@ export default function Home() {
       <div style={ui.header}>
         <div style={ui.brand}>Waffle Lounge</div>
 
-        <button
-          style={ui.tokenBtn}
-          onClick={() => {
-            const ph = localStorage.getItem("myPhone");
-            ph ? setLocation(`/mytoken?phone=${ph}`) : alert("No previous order");
-          }}
-        >
-          🎟 My Token
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button style={ui.cartBtn} onClick={() => setOpen(true)}>
+            🛒 Cart
+            {cart.length > 0 && <span style={ui.badge}>{cart.length}</span>}
+          </button>
+
+          <button
+            style={ui.tokenBtn}
+            onClick={() => {
+              const ph = localStorage.getItem("myPhone");
+              ph ? setLocation(`/mytoken?phone=${ph}`) : alert("No previous order");
+            }}
+          >
+            🎟 My Token
+          </button>
+        </div>
       </div>
 
       {/* MENU */}
       <div style={ui.menuGrid}>
         {MENU.map(m => (
-          <div key={m.id} style={ui.card} onClick={() => setSelectedItem(m)}>
+          <div key={m.id} style={ui.card}>
             <img src={m.img} alt="" style={ui.img} />
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 800 }}>{m.name}</div>
               ₹{m.price}
             </div>
-            <button
-              style={ui.addBtn}
-              onClick={(e) => {
-                e.stopPropagation();
-                add(m);
-              }}
-            >
-              + Add
-            </button>
+            <button style={ui.addBtn} onClick={() => add(m)}>+ Add</button>
           </div>
         ))}
       </div>
-
-      {/* FLOATING CART */}
-      {cart.length > 0 && (
-        <button style={ui.floatingCart} onClick={() => setOpen(true)}>
-          🛒 {cart.length}
-        </button>
-      )}
-
-      {/* ITEM POPUP */}
-      {selectedItem && (
-        <div style={ui.overlay} onClick={() => setSelectedItem(null)}>
-          <div style={ui.modal} onClick={e => e.stopPropagation()}>
-            <img src={selectedItem.img} alt="" style={{ width: "100%", borderRadius: 12 }} />
-            <h2 style={{ color: "#ffd166" }}>{selectedItem.name}</h2>
-            <b>₹{selectedItem.price}</b>
-            <p style={{ color: "#ccc" }}>{selectedItem.desc}</p>
-
-            <button
-              style={ui.placeBtn}
-              onClick={() => {
-                add(selectedItem);
-                setSelectedItem(null);
-              }}
-            >
-              Add to Cart
-            </button>
-
-            <button
-              style={{ ...ui.placeBtn, marginTop: 8, background: "#222", color: "#ffd166" }}
-              onClick={() => setSelectedItem(null)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* CART DRAWER */}
       {open && (
         <div style={ui.overlay} onClick={() => setOpen(false)}>
           <div style={ui.drawer} onClick={e => e.stopPropagation()}>
             <div style={ui.drawerHeader}>
-              <h3>Your Cart</h3>
+              <h2>Your Cart</h2>
               <button onClick={() => setOpen(false)}>✕</button>
             </div>
 
