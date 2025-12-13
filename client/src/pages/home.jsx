@@ -6,35 +6,19 @@ import Footer from "../components/Footer";
 
 /* ---------------- MENU ---------------- */
 const MENU = [
-  { id: "w1", name: "Classic Belgian Waffle", price: 100, img: "/images/waffle1.jpeg" },
-  { id: "w2", name: "Strawberry Cream Waffle", price: 150, img: "/images/waffle2.jpeg" },
-  { id: "w3", name: "Nutella Chocolate Waffle", price: 180, img: "/images/waffle3.jpeg" },
-  { id: "w4", name: "Banana Caramel Waffle", price: 150, img: "/images/waffle4.jpeg" },
-  { id: "w5", name: "Blueberry Bliss Waffle", price: 180, img: "/images/waffle5.jpeg" }
+  { id: "w1", name: "Classic Belgian Waffle", price: 100, img: "/images/waffle1.jpeg", desc: "Crispy outside, soft inside. Traditional Belgian taste." },
+  { id: "w2", name: "Strawberry Cream Waffle", price: 150, img: "/images/waffle2.jpeg", desc: "Fresh strawberries with whipped cream." },
+  { id: "w3", name: "Nutella Chocolate Waffle", price: 180, img: "/images/waffle3.jpeg", desc: "Loaded with Nutella & chocolate drizzle." },
+  { id: "w4", name: "Banana Caramel Waffle", price: 150, img: "/images/waffle4.jpeg", desc: "Banana slices with caramel sauce." },
+  { id: "w5", name: "Blueberry Bliss Waffle", price: 180, img: "/images/waffle5.jpeg", desc: "Blueberry compote with vanilla cream." }
 ];
 
 /* ---------------- STYLES ---------------- */
 const ui = {
-  page: {
-    background: "#0b0b0b",
-    color: "#f6e8c1",
-    minHeight: "100vh",
-    padding: 16,
-    fontFamily: "'Segoe UI', Arial"
-  },
+  page: { background: "#0b0b0b", color: "#f6e8c1", minHeight: "100vh", padding: 16 },
 
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16
-  },
-
-  brand: {
-    fontSize: 26,
-    fontWeight: 900,
-    color: "#ffd166"
-  },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  brand: { fontSize: 26, fontWeight: 900, color: "#ffd166" },
 
   tokenBtn: {
     background: "transparent",
@@ -42,8 +26,7 @@ const ui = {
     color: "#ffd166",
     padding: "8px 14px",
     borderRadius: 20,
-    fontWeight: 700,
-    cursor: "pointer"
+    fontWeight: 700
   },
 
   cartBtn: {
@@ -53,7 +36,6 @@ const ui = {
     padding: "8px 14px",
     borderRadius: 20,
     fontWeight: 800,
-    cursor: "pointer",
     position: "relative"
   },
 
@@ -65,8 +47,7 @@ const ui = {
     color: "#fff",
     fontSize: 12,
     padding: "2px 6px",
-    borderRadius: 20,
-    fontWeight: 900
+    borderRadius: 20
   },
 
   menuGrid: { display: "grid", gap: 14 },
@@ -77,107 +58,66 @@ const ui = {
     padding: 12,
     background: "#111",
     borderRadius: 12,
-    alignItems: "center"
+    alignItems: "center",
+    cursor: "pointer"
   },
 
-  img: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-    objectFit: "cover"
-  },
+  img: { width: 80, height: 80, borderRadius: 10, objectFit: "cover" },
 
   addBtn: {
     background: "#ffd166",
     border: "none",
     padding: "8px 14px",
     borderRadius: 8,
-    fontWeight: 800,
-    cursor: "pointer"
+    fontWeight: 800
   },
 
+  /* ---------- ITEM POPUP ---------- */
   overlay: {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,.6)",
-    zIndex: 999
-  },
-
-  drawer: {
-    position: "fixed",
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: "100%",
-    maxWidth: 420,
-    background: "#0f0f0f",
+    background: "rgba(0,0,0,.7)",
+    zIndex: 1000,
     display: "flex",
-    flexDirection: "column"
+    justifyContent: "center",
+    alignItems: "center"
   },
 
-  drawerHeader: {
-    padding: 16,
-    borderBottom: "1px solid #222",
+  popup: {
+    background: "#111",
+    borderRadius: 14,
+    width: "90%",
+    maxWidth: 420,
+    maxHeight: "85vh",
+    overflowY: "auto",
+    padding: 16
+  },
+
+  popupImg: {
+    width: "100%",
+    height: 220,
+    objectFit: "cover",
+    borderRadius: 12,
+    marginBottom: 12
+  },
+
+  popupTitle: { fontSize: 22, fontWeight: 900, color: "#ffd166" },
+  popupDesc: { marginTop: 8, color: "#ddd", lineHeight: 1.6 },
+
+  popupFooter: {
+    marginTop: 16,
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center"
   },
 
-  drawerBody: {
-    flex: 1,
-    overflowY: "auto",
-    padding: 16
-  },
-
-  drawerFooter: {
-    padding: 16,
-    borderTop: "1px solid #222"
-  },
-
-  cartRow: {
-    display: "grid",
-    gridTemplateColumns: "1fr auto auto",
-    gap: 12,
-    alignItems: "center",
-    marginBottom: 14
-  },
-
-  qtyBtn: {
-    background: "#222",
+  closeBtn: {
+    background: "#333",
     color: "#ffd166",
     border: "none",
-    padding: "6px 10px",
-    borderRadius: 6,
-    fontWeight: 900
-  },
-
-  removeBtn: {
-    background: "#441111",
-    color: "#ff9b9b",
-    border: "none",
-    padding: "6px 10px",
-    borderRadius: 6,
-    fontWeight: 900
-  },
-
-  input: {
-    width: "100%",
-    padding: 12,
-    marginBottom: 10,
+    padding: "8px 14px",
     borderRadius: 8,
-    border: "1px solid #222",
-    background: "#111",
-    color: "#fff"
-  },
-
-  placeBtn: {
-    width: "100%",
-    padding: "14px",
-    background: "#ffd166",
-    border: "none",
-    borderRadius: 10,
-    fontWeight: 900,
-    cursor: "pointer"
+    fontWeight: 800
   }
 };
 
@@ -185,7 +125,8 @@ const ui = {
 export default function Home() {
   const [, setLocation] = useLocation();
   const [cart, setCart] = useState([]);
-  const [open, setOpen] = useState(false);
+  const [openItem, setOpenItem] = useState(null);
+  const [openCart, setOpenCart] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [session, setSession] = useState("Session 1");
@@ -206,16 +147,7 @@ export default function Home() {
         ? c.map(x => x.id === item.id ? { ...x, qty: x.qty + 1 } : x)
         : [...c, { ...item, qty: 1 }]
     );
-  }
-
-  function updateQty(id, d) {
-    setCart(c =>
-      c.map(x => x.id === id ? { ...x, qty: x.qty + d } : x).filter(x => x.qty > 0)
-    );
-  }
-
-  function remove(id) {
-    setCart(c => c.filter(x => x.id !== id));
+    setOpenItem(null);
   }
 
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
@@ -249,20 +181,14 @@ export default function Home() {
       {/* HEADER */}
       <div style={ui.header}>
         <div style={ui.brand}>Waffle Lounge</div>
-
         <div style={{ display: "flex", gap: 10 }}>
-          <button style={ui.cartBtn} onClick={() => setOpen(true)}>
-            🛒 Cart
-            {cart.length > 0 && <span style={ui.badge}>{cart.length}</span>}
+          <button style={ui.cartBtn} onClick={() => setOpenCart(true)}>
+            🛒 Cart {cart.length > 0 && <span style={ui.badge}>{cart.length}</span>}
           </button>
-
-          <button
-            style={ui.tokenBtn}
-            onClick={() => {
-              const ph = localStorage.getItem("myPhone");
-              ph ? setLocation(`/mytoken?phone=${ph}`) : alert("No previous order");
-            }}
-          >
+          <button style={ui.tokenBtn} onClick={() => {
+            const ph = localStorage.getItem("myPhone");
+            ph ? setLocation(`/mytoken?phone=${ph}`) : alert("No previous order");
+          }}>
             🎟 My Token
           </button>
         </div>
@@ -271,56 +197,31 @@ export default function Home() {
       {/* MENU */}
       <div style={ui.menuGrid}>
         {MENU.map(m => (
-          <div key={m.id} style={ui.card}>
+          <div key={m.id} style={ui.card} onClick={() => setOpenItem(m)}>
             <img src={m.img} alt="" style={ui.img} />
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 800 }}>{m.name}</div>
               ₹{m.price}
             </div>
-            <button style={ui.addBtn} onClick={() => add(m)}>+ Add</button>
+            <button style={ui.addBtn} onClick={e => { e.stopPropagation(); add(m); }}>
+              + Add
+            </button>
           </div>
         ))}
       </div>
 
-      {/* CART DRAWER */}
-      {open && (
-        <div style={ui.overlay} onClick={() => setOpen(false)}>
-          <div style={ui.drawer} onClick={e => e.stopPropagation()}>
-            <div style={ui.drawerHeader}>
-              <h2>Your Cart</h2>
-              <button onClick={() => setOpen(false)}>✕</button>
-            </div>
+      {/* ITEM POPUP */}
+      {openItem && (
+        <div style={ui.overlay} onClick={() => setOpenItem(null)}>
+          <div style={ui.popup} onClick={e => e.stopPropagation()}>
+            <img src={openItem.img} alt="" style={ui.popupImg} />
+            <div style={ui.popupTitle}>{openItem.name}</div>
+            <div style={ui.popupDesc}>{openItem.desc}</div>
 
-            <div style={ui.drawerBody}>
-              {cart.map(i => (
-                <div key={i.id} style={ui.cartRow}>
-                  <div>
-                    <b>{i.name}</b>
-                    <div>₹{i.price * i.qty}</div>
-                  </div>
-
-                  <div>
-                    <button style={ui.qtyBtn} onClick={() => updateQty(i.id, -1)}>−</button>
-                    <span style={{ margin: "0 6px" }}>{i.qty}</span>
-                    <button style={ui.qtyBtn} onClick={() => updateQty(i.id, 1)}>+</button>
-                  </div>
-
-                  <button style={ui.removeBtn} onClick={() => remove(i.id)}>✕</button>
-                </div>
-              ))}
-            </div>
-
-            <div style={ui.drawerFooter}>
-              <input style={ui.input} placeholder="Your Name" value={name} onChange={e => setName(e.target.value)} />
-              <input style={ui.input} placeholder="Phone Number" value={phone} onChange={e => setPhone(e.target.value)} />
-              <div style={{ marginBottom: 10, fontWeight: 800 }}>Total: ₹{total}</div>
-              <button
-                style={{ ...ui.placeBtn, opacity: canSubmit ? 1 : 0.4 }}
-                disabled={!canSubmit || submitting}
-                onClick={submit}
-              >
-                {submitting ? "Placing…" : "Place Order"}
-              </button>
+            <div style={ui.popupFooter}>
+              <div style={{ fontWeight: 900 }}>₹{openItem.price}</div>
+              <button style={ui.addBtn} onClick={() => add(openItem)}>Add</button>
+              <button style={ui.closeBtn} onClick={() => setOpenItem(null)}>Close</button>
             </div>
           </div>
         </div>
