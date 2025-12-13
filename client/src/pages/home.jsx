@@ -77,22 +77,35 @@ const ui = {
   },
 
   /* ---------- Floating Cart ---------- */
+  // floatingCart: {
+  //   position: "fixed",
+  //   bottom: 56,
+  //   right: 16,
+  //   // background: "#ffd166",
+  //   background: "linear-gradient(135deg, #550a0aff, #610a0dff)",
+  //   color: "#111",
+  //   border: "none",
+  //   padding: "14px 18px",
+  //   borderRadius: 30,
+  //   fontWeight: 900,
+  //   fontSize: 16,
+  //   cursor: "pointer",
+  //   zIndex: 1000,
+  //   boxShadow: "0 10px 25px rgba(0,0,0,.5)"
+  // },
+
   floatingCart: {
-    position: "fixed",
-    bottom: 56,
-    right: 16,
-    // background: "#ffd166",
-    background: "linear-gradient(135deg, #550a0aff, #610a0dff)",
-    color: "#111",
-    border: "none",
-    padding: "14px 18px",
-    borderRadius: 30,
-    fontWeight: 900,
-    fontSize: 16,
-    cursor: "pointer",
-    zIndex: 1000,
-    boxShadow: "0 10px 25px rgba(0,0,0,.5)"
-  },
+  background: "linear-gradient(135deg, #550a0a, #8b0f12)",
+  color: "#fff",
+  border: "none",
+  padding: "14px 18px",
+  borderRadius: 30,
+  fontWeight: 900,
+  fontSize: 16,
+  cursor: "pointer",
+  boxShadow: "0 10px 25px rgba(0,0,0,.5)"
+},
+
 
   /* ---------- Drawer ---------- */
   overlay: {
