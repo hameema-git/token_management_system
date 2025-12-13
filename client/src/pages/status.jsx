@@ -247,7 +247,7 @@ export default function TokenStatus() {
         <div style={styles.actionRowBottom}>
           <Link href="/">
             <button style={{ ...styles.btn, ...styles.placeAnother }}>
-              Place Another Order
+              Back To Menu
             </button>
           </Link>
 

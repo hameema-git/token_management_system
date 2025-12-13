@@ -36,6 +36,12 @@ const ui = {
     color: "#ffd166"
   },
 
+  headerActions: {
+    display: "flex",
+    gap: 10,
+    alignItems: "center"
+  },
+
   tokenBtn: {
     background: "transparent",
     border: "1px solid #ffd166",
@@ -44,6 +50,17 @@ const ui = {
     borderRadius: 20,
     fontWeight: 700,
     cursor: "pointer"
+  },
+
+  cartBtn: {
+    background: "linear-gradient(135deg, #8b0f12, #550a0a)",
+    color: "#fff",
+    border: "none",
+    padding: "8px 14px",
+    borderRadius: 20,
+    fontWeight: 900,
+    cursor: "pointer",
+    boxShadow: "0 6px 18px rgba(0,0,0,.6)"
   },
 
   menuGrid: {
@@ -76,38 +93,6 @@ const ui = {
     cursor: "pointer"
   },
 
-  /* ---------- Floating Cart ---------- */
-  // floatingCart: {
-  //   position: "fixed",
-  //   bottom: 56,
-  //   right: 16,
-  //   // background: "#ffd166",
-  //   background: "linear-gradient(135deg, #550a0aff, #610a0dff)",
-  //   color: "#111",
-  //   border: "none",
-  //   padding: "14px 18px",
-  //   borderRadius: 30,
-  //   fontWeight: 900,
-  //   fontSize: 16,
-  //   cursor: "pointer",
-  //   zIndex: 1000,
-  //   boxShadow: "0 10px 25px rgba(0,0,0,.5)"
-  // },
-
-  floatingCart: {
-  background: "linear-gradient(135deg, #550a0a, #8b0f12)",
-  color: "#fff",
-  border: "none",
-  padding: "14px 18px",
-  borderRadius: 30,
-  fontWeight: 900,
-  fontSize: 16,
-  cursor: "pointer",
-  boxShadow: "0 10px 25px rgba(0,0,0,.5)"
-},
-
-
-  /* ---------- Drawer ---------- */
   overlay: {
     position: "fixed",
     inset: 0,
@@ -214,24 +199,23 @@ export default function Home() {
   }, []);
 
   function add(item) {
-    setCart((c) => {
-      const f = c.find((x) => x.id === item.id);
+    setCart(c => {
+      const f = c.find(x => x.id === item.id);
       return f
-        ? c.map((x) => (x.id === item.id ? { ...x, qty: x.qty + 1 } : x))
+        ? c.map(x => x.id === item.id ? { ...x, qty: x.qty + 1 } : x)
         : [...c, { ...item, qty: 1 }];
     });
   }
 
   function updateQty(id, d) {
-    setCart((c) =>
-      c
-        .map((x) => (x.id === id ? { ...x, qty: x.qty + d } : x))
-        .filter((x) => x.qty > 0)
+    setCart(c =>
+      c.map(x => x.id === id ? { ...x, qty: x.qty + d } : x)
+       .filter(x => x.qty > 0)
     );
   }
 
   function remove(id) {
-    setCart((c) => c.filter((x) => x.id !== id));
+    setCart(c => c.filter(x => x.id !== id));
   }
 
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
@@ -245,7 +229,7 @@ export default function Home() {
       createdAt: serverTimestamp(),
       customerName: name,
       phone,
-      items: cart.map((i) => ({
+      items: cart.map(i => ({
         id: i.id,
         name: i.name,
         price: i.price,
@@ -265,20 +249,29 @@ export default function Home() {
       {/* HEADER */}
       <div style={ui.header}>
         <div style={ui.brand}>Waffle Lounge</div>
-        <button
-          style={ui.tokenBtn}
-          onClick={() => {
-            const ph = localStorage.getItem("myPhone");
-            ph ? setLocation(`/mytoken?phone=${ph}`) : alert("No previous order");
-          }}
-        >
-          🎟 My Token
-        </button>
+
+        <div style={ui.headerActions}>
+          <button
+            style={ui.tokenBtn}
+            onClick={() => {
+              const ph = localStorage.getItem("myPhone");
+              ph ? setLocation(`/mytoken?phone=${ph}`) : alert("No previous order");
+            }}
+          >
+            🎟 My Token
+          </button>
+
+          {cart.length > 0 && (
+            <button style={ui.cartBtn} onClick={() => setOpen(true)}>
+              🛒 {cart.length}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* MENU */}
       <div style={ui.menuGrid}>
-        {MENU.map((m) => (
+        {MENU.map(m => (
           <div key={m.id} style={ui.card}>
             <img src={m.img} alt="" style={ui.img} />
             <div style={{ flex: 1 }}>
@@ -290,24 +283,17 @@ export default function Home() {
         ))}
       </div>
 
-      {/* FLOATING CART */}
-      {cart.length > 0 && (
-        <button style={ui.floatingCart} onClick={() => setOpen(true)}>
-          🛒 {cart.length}
-        </button>
-      )}
-
       {/* CART DRAWER */}
       {open && (
         <div style={ui.overlay} onClick={() => setOpen(false)}>
-          <div style={ui.drawer} onClick={(e) => e.stopPropagation()}>
+          <div style={ui.drawer} onClick={e => e.stopPropagation()}>
             <div style={ui.drawerHeader}>
               <h2>Your Cart</h2>
               <button onClick={() => setOpen(false)}>✕</button>
             </div>
 
             <div style={ui.drawerBody}>
-              {cart.map((i) => (
+              {cart.map(i => (
                 <div key={i.id} style={ui.cartRow}>
                   <div>
                     <b>{i.name}</b>
@@ -326,8 +312,8 @@ export default function Home() {
             </div>
 
             <div style={ui.drawerFooter}>
-              <input style={ui.input} placeholder="Your Name" value={name} onChange={(e) => setName(e.target.value)} />
-              <input style={ui.input} placeholder="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input style={ui.input} placeholder="Your Name" value={name} onChange={e => setName(e.target.value)} />
+              <input style={ui.input} placeholder="Phone Number" value={phone} onChange={e => setPhone(e.target.value)} />
               <div style={{ marginBottom: 10, fontWeight: 800 }}>Total: ₹{total}</div>
               <button
                 style={{ ...ui.placeBtn, opacity: canSubmit ? 1 : 0.4 }}
