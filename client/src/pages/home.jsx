@@ -79,10 +79,10 @@ const ui = {
   /* ---------- Floating Cart ---------- */
   floatingCart: {
     position: "fixed",
-    bottom: 16,
+    bottom: 26,
     right: 16,
     // background: "#ffd166",
-    background: "linear-gradient(135deg, #2ecc71, #27ae60)",
+    background: "linear-gradient(135deg, #2ecc71, #610a0dff)",
     color: "#111",
     border: "none",
     padding: "14px 18px",
