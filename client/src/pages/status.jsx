@@ -14,6 +14,7 @@ import {
 import { Link, useLocation } from "wouter";
 import Footer from "../components/Footer";
 
+/* ---------------- STYLES ---------------- */
 const styles = {
   page: {
     background: "#0b0b0b",
@@ -23,6 +24,7 @@ const styles = {
     fontFamily: "'Segoe UI', Roboto, Arial, sans-serif"
   },
   container: { maxWidth: 720, margin: "auto" },
+
   header: {
     display: "flex",
     justifyContent: "space-between",
@@ -77,19 +79,11 @@ const styles = {
     textAlign: "center"
   },
 
-  listContainer: { marginTop: 28 },
-  listItem: {
-    background: "#111",
-    padding: "12px 14px",
-    borderRadius: 8,
-    borderLeft: "4px solid #444",
-    marginBottom: 10
-  },
-
   actionRowBottom: {
     display: "flex",
     gap: 12,
-    marginTop: 40
+    marginTop: 40,
+    flexWrap: "wrap"
   },
   btn: {
     flex: 1,
@@ -101,9 +95,52 @@ const styles = {
     fontSize: 16
   },
   placeAnother: { background: "#222", color: "#ffd166" },
-  refreshBtn: { background: "#ffd166", color: "#111" }
+  refreshBtn: { background: "#ffd166", color: "#111" },
+  rulesBtn: { background: "#333", color: "#ffd166" },
+
+  /* ---------- RULES MODAL ---------- */
+  overlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.7)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000
+  },
+  modal: {
+    background: "#111",
+    padding: 20,
+    borderRadius: 12,
+    maxWidth: 420,
+    width: "90%",
+    border: "2px solid #ffd166"
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 900,
+    color: "#ffd166",
+    marginBottom: 12
+  },
+  ruleText: {
+    fontSize: 14,
+    lineHeight: 1.6,
+    color: "#f6e8c1"
+  },
+  closeBtn: {
+    marginTop: 14,
+    width: "100%",
+    padding: "10px 12px",
+    background: "#ffd166",
+    color: "#111",
+    border: "none",
+    borderRadius: 8,
+    fontWeight: 800,
+    cursor: "pointer"
+  }
 };
 
+/* ---------------- COMPONENT ---------------- */
 export default function TokenStatus() {
   const [, setLocation] = useLocation();
   const params = new URLSearchParams(window.location.search);
@@ -118,15 +155,15 @@ export default function TokenStatus() {
 
   const [activeOrders, setActiveOrders] = useState([]);
   const [completedOrders, setCompletedOrders] = useState([]);
+  const [showRules, setShowRules] = useState(false);
 
   /* ---------------- Load active session ---------------- */
-  async function loadSession() {
-    const ref = doc(db, "settings", "activeSession");
-    const snap = await getDoc(ref);
-    setSession(snap.exists() ? snap.data().session_id : "Session 1");
-  }
-
   useEffect(() => {
+    async function loadSession() {
+      const ref = doc(db, "settings", "activeSession");
+      const snap = await getDoc(ref);
+      setSession(snap.exists() ? snap.data().session_id : "Session 1");
+    }
     loadSession();
   }, []);
 
@@ -142,7 +179,6 @@ export default function TokenStatus() {
   /* ---------------- Load Orders ---------------- */
   async function loadOrders() {
     if (!phone || !session) return;
-
     setLoading(true);
 
     const q = query(
@@ -153,11 +189,10 @@ export default function TokenStatus() {
     );
 
     const snap = await getDocs(q);
-    const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     setActiveOrders(all.filter(o => o.status !== "completed"));
     setCompletedOrders(all.filter(o => o.status === "completed"));
-
     setLoading(false);
   }
 
@@ -166,13 +201,9 @@ export default function TokenStatus() {
     loadOrders();
   }
 
-  function handleRefresh() {
-    loadOrders();
-  }
-
   const mainOrder =
     activeOrders.length > 0
-      ? activeOrders.sort((a, b) => a.token - b.token)[0]
+      ? [...activeOrders].sort((a, b) => a.token - b.token)[0]
       : null;
 
   /* ---------------- RENDER ---------------- */
@@ -180,16 +211,16 @@ export default function TokenStatus() {
     <div style={styles.page}>
       <div style={styles.container}>
 
-        {/* Header */}
+        {/* HEADER */}
         <div style={styles.header}>
           <div>
             <div style={styles.title}>Waffle Lounge — Token Status</div>
-            <div style={styles.subtitle}>Track your order</div>
+            <div style={styles.subtitle}>Track your order in real time</div>
           </div>
           <div style={styles.subtitle}>Session: {session || "-"}</div>
         </div>
 
-        {/* Search */}
+        {/* SEARCH */}
         <div style={styles.inputRow}>
           <input
             placeholder="Enter phone number"
@@ -202,10 +233,9 @@ export default function TokenStatus() {
           </button>
         </div>
 
-        {/* LOADING */}
         {loading && <div style={{ textAlign: "center" }}>Loading…</div>}
 
-        {/* ACTIVE TOKEN CARD */}
+        {/* ACTIVE ORDER */}
         {mainOrder && (
           <div style={styles.ticket}>
             <div style={{ fontSize: 64, fontWeight: 900, textAlign: "center" }}>
@@ -232,11 +262,9 @@ export default function TokenStatus() {
             <div style={{ fontSize: 26, fontWeight: 900, color: "#2ecc71" }}>
               ✅ Order Completed
             </div>
-
             <div style={{ marginTop: 10, fontSize: 18 }}>
               Please collect your order at the counter
             </div>
-
             <div style={{ marginTop: 12, color: "#bfb39a" }}>
               Thank you for visiting Waffle Lounge 🍰
             </div>
@@ -253,14 +281,47 @@ export default function TokenStatus() {
 
           <button
             style={{ ...styles.btn, ...styles.refreshBtn }}
-            onClick={handleRefresh}
+            onClick={loadOrders}
           >
             Refresh
+          </button>
+
+          <button
+            style={{ ...styles.btn, ...styles.rulesBtn }}
+            onClick={() => setShowRules(true)}
+          >
+            Rules
           </button>
         </div>
 
         <Footer />
       </div>
+
+      {/* RULES POPUP */}
+      {showRules && (
+        <div style={styles.overlay} onClick={() => setShowRules(false)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalTitle}>Token Rules</div>
+
+            <div style={styles.ruleText}>
+              • <b>Token</b> — Your order number<br />
+              • <b>Now Serving</b> — Token currently being prepared<br />
+              • <b>Position</b> — Tokens ahead of you<br />
+              • <b>Position = 0</b> — Please go to the counter now<br />
+              • <b>Negative position</b> — Your token was skipped earlier<br />
+              • Completed orders are removed automatically
+            </div>
+
+            <button
+              style={styles.closeBtn}
+              onClick={() => setShowRules(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
