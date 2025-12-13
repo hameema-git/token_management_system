@@ -1,3 +1,4 @@
+// client/src/pages/home.jsx
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { db, serverTimestamp } from "../firebaseInit";
@@ -12,105 +13,99 @@ const MENU = [
   { id: "w5", name: "Blueberry Bliss Waffle", price: 180, img: "/images/waffle5.jpeg" }
 ];
 
-const isMobile = window.innerWidth < 768;
-
 const styles = {
   page: { background: "#0b0b0b", color: "#f6e8c1", minHeight: "100vh", padding: 20 },
   brand: { fontSize: 28, fontWeight: 900, color: "#ffd166" },
 
-  menuGrid: { display: "grid", gap: 14 },
-  card: {
+  menuCard: {
     display: "flex",
     gap: 14,
     alignItems: "center",
     padding: 12,
-    borderRadius: 12,
     background: "#111",
-    border: "1px solid #222"
+    borderRadius: 12,
+    marginBottom: 14
   },
+
   img: { width: 80, height: 80, borderRadius: 10, objectFit: "cover" },
 
   addBtn: {
     background: "#ffd166",
     color: "#111",
-    padding: "8px 12px",
+    padding: "8px 14px",
     borderRadius: 8,
     border: "none",
     fontWeight: 800,
     cursor: "pointer"
   },
 
-  /* Floating Cart Button */
-  cartFab: {
-    position: "fixed",
-    right: 20,
-    bottom: 20,
-    background: "#ffd166",
-    color: "#111",
-    padding: "14px 18px",
-    borderRadius: 999,
-    fontWeight: 900,
-    border: "none",
-    zIndex: 999,
-    cursor: "pointer",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
-  },
-
-  /* Drawer */
-  backdrop: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.6)",
-    zIndex: 998
-  },
-
+  /* CART DRAWER */
   drawer: {
     position: "fixed",
-    background: "#111",
-    zIndex: 999,
-    transition: "transform 0.3s ease",
-    width: isMobile ? "100%" : 380,
-    height: isMobile ? "70%" : "100%",
-    right: isMobile ? 0 : 0,
-    bottom: isMobile ? 0 : 0,
-    borderTopLeftRadius: isMobile ? 16 : 0,
-    borderTopRightRadius: isMobile ? 16 : 0,
-    padding: 16,
-    overflowY: "auto"
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "85vh",
+    background: "#0b0b0b",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    display: "flex",
+    flexDirection: "column",
+    zIndex: 1000
   },
 
-  input: {
-    width: "100%",
-    padding: 12,
-    marginTop: 8,
-    borderRadius: 8,
-    background: "#0c0c0c",
-    border: "1px solid #222",
-    color: "#fff"
+  drawerHeader: {
+    padding: 16,
+    borderBottom: "1px solid #222",
+    fontSize: 22,
+    fontWeight: 900,
+    color: "#ffd166"
+  },
+
+  drawerItems: {
+    flex: 1,
+    overflowY: "auto",
+    padding: "14px 16px"
+  },
+
+  drawerFooter: {
+    padding: 16,
+    borderTop: "1px solid #222",
+    background: "#111"
+  },
+
+  qtyBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    border: "none",
+    background: "#222",
+    color: "#ffd166",
+    fontWeight: 900,
+    fontSize: 18
   },
 
   placeBtn: {
-    marginTop: 12,
-    background: "#ffd166",
-    color: "#111",
-    padding: "12px 14px",
+    width: "100%",
+    padding: 14,
     borderRadius: 10,
     border: "none",
     fontWeight: 900,
-    width: "100%"
+    fontSize: 16
   }
 };
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const [cart, setCart] = useState([]);
-  const [open, setOpen] = useState(false);
 
+  const [cart, setCart] = useState([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [session, setSession] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  /* ---------- Load Active Session ---------- */
   useEffect(() => {
     async function loadSession() {
       const snap = await getDoc(doc(db, "settings", "activeSession"));
@@ -119,124 +114,140 @@ export default function Home() {
     loadSession();
   }, []);
 
+  /* ---------- Cart helpers ---------- */
   function addToCart(item) {
-    setCart((prev) => {
-      const found = prev.find((x) => x.id === item.id);
-      if (found) {
-        return prev.map((x) =>
-          x.id === item.id ? { ...x, qty: x.qty + 1 } : x
-        );
-      }
+    setDrawerOpen(true);
+    setCart(prev => {
+      const found = prev.find(i => i.id === item.id);
+      if (found) return prev.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
       return [...prev, { ...item, qty: 1 }];
     });
-    setOpen(true);
   }
 
-  function removeFromCart(id) {
-    setCart((prev) => prev.filter((x) => x.id !== id));
+  function increaseQty(id) {
+    setCart(prev => prev.map(i => i.id === id ? { ...i, qty: i.qty + 1 } : i));
+  }
+
+  function decreaseQty(id) {
+    setCart(prev =>
+      prev
+        .map(i => i.id === id ? { ...i, qty: i.qty - 1 } : i)
+        .filter(i => i.qty > 0)
+    );
+  }
+
+  function removeItem(id) {
+    setCart(prev => prev.filter(i => i.id !== id));
   }
 
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
-  async function submit(e) {
-    e.preventDefault();
-    if (!name || !phone || cart.length === 0) return;
+  /* ---------- Submit ---------- */
+  async function submit() {
+    if (cart.length === 0 || submitting) return;
 
     setSubmitting(true);
+    try {
+      await addDoc(collection(db, "orders"), {
+        createdAt: serverTimestamp(),
+        customerName: name,
+        phone,
+        items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.qty })),
+        total,
+        status: "pending",
+        session_id: session
+      });
 
-    await addDoc(collection(db, "orders"), {
-      createdAt: serverTimestamp(),
-      customerName: name,
-      phone,
-      items: cart.map((i) => ({
-        id: i.id,
-        name: i.name,
-        price: i.price,
-        quantity: i.qty
-      })),
-      total,
-      status: "pending",
-      session_id: session
-    });
-
-    localStorage.setItem("myPhone", phone);
-    setLocation(`/mytoken?phone=${phone}`);
+      localStorage.setItem("myPhone", phone);
+      setLocation(`/mytoken?phone=${phone}`);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <div style={styles.page}>
-      <div style={styles.brand}>Waffle Lounge</div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+        <div style={styles.brand}>Waffle Lounge</div>
 
-      <div style={styles.menuGrid}>
-        {MENU.map((item) => (
-          <div key={item.id} style={styles.card}>
-            <img src={item.img} alt={item.name} style={styles.img} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 800 }}>{item.name}</div>
-              <div>₹{item.price}</div>
-            </div>
-            <button style={styles.addBtn} onClick={() => addToCart(item)}>
-              + Add
-            </button>
-          </div>
-        ))}
+        <button
+          onClick={() => {
+            const ph = localStorage.getItem("myPhone");
+            if (ph) setLocation(`/mytoken?phone=${ph}`);
+          }}
+          style={styles.addBtn}
+        >
+          My Token
+        </button>
       </div>
 
-      {cart.length > 0 && (
-        <button style={styles.cartFab} onClick={() => setOpen(true)}>
-          Cart ({cart.length})
-        </button>
-      )}
+      {MENU.map(item => (
+        <div key={item.id} style={styles.menuCard}>
+          <img src={item.img} style={styles.img} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800 }}>{item.name}</div>
+            <div>₹{item.price}</div>
+          </div>
+          <button style={styles.addBtn} onClick={() => addToCart(item)}>+ Add</button>
+        </div>
+      ))}
 
-      {open && <div style={styles.backdrop} onClick={() => setOpen(false)} />}
+      {/* CART DRAWER */}
+      {drawerOpen && (
+        <div style={styles.drawer}>
+          <div style={styles.drawerHeader}>Your Cart</div>
 
-      {open && (
-        <div
-          style={{
-            ...styles.drawer,
-            transform: open
-              ? "translateX(0)"
-              : isMobile
-              ? "translateY(100%)"
-              : "translateX(100%)"
-          }}
-        >
-          <h2 style={{ color: "#ffd166" }}>Your Cart</h2>
+          <div style={styles.drawerItems}>
+            {cart.map(item => (
+              <div key={item.id} style={{ marginBottom: 14 }}>
+                <div style={{ fontWeight: 800 }}>{item.name}</div>
 
-          {cart.map((i) => (
-            <div key={i.id} style={{ marginBottom: 8 }}>
-              {i.qty} × {i.name} — ₹{i.qty * i.price}
-              <button
-                onClick={() => removeFromCart(i.id)}
-                style={{ marginLeft: 8, color: "#ff6b6b", background: "none", border: "none" }}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button style={styles.qtyBtn} onClick={() => decreaseQty(item.id)}>−</button>
+                    <div style={{ fontWeight: 800 }}>{item.qty}</div>
+                    <button style={styles.qtyBtn} onClick={() => increaseQty(item.id)}>+</button>
+                  </div>
 
-          <div style={{ fontWeight: 900, marginTop: 10 }}>
-            Total: ₹{total}
+                  <div>₹{item.qty * item.price}</div>
+
+                  <button onClick={() => removeItem(item.id)} style={{ color: "#ff6b6b" }}>✕</button>
+                </div>
+              </div>
+            ))}
           </div>
 
-          <form onSubmit={submit}>
+          <div style={styles.drawerFooter}>
             <input
-              style={styles.input}
               placeholder="Your Name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={e => setName(e.target.value)}
+              style={{ width: "100%", padding: 10, marginBottom: 8 }}
             />
             <input
-              style={styles.input}
               placeholder="Phone Number"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={e => setPhone(e.target.value)}
+              style={{ width: "100%", padding: 10, marginBottom: 12 }}
             />
 
-            <button disabled={submitting} style={styles.placeBtn}>
+            <div style={{ fontWeight: 900, marginBottom: 10 }}>
+              Total: ₹{total.toFixed(2)}
+            </div>
+
+            <button
+              onClick={submit}
+              disabled={cart.length === 0 || submitting}
+              style={{
+                ...styles.placeBtn,
+                background: cart.length === 0 ? "#555" : "#ffd166",
+                color: cart.length === 0 ? "#999" : "#111",
+                cursor: cart.length === 0 ? "not-allowed" : "pointer"
+              }}
+            >
               {submitting ? "Placing…" : "Place Order"}
             </button>
-          </form>
+          </div>
         </div>
       )}
 
