@@ -1,4 +1,3 @@
-// client/src/pages/Home.jsx
 import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { db, serverTimestamp } from "../firebaseInit";
@@ -114,6 +113,15 @@ const ui = {
   }
 };
 
+const qtyBtn = {
+  background: "#ffd166",
+  border: "none",
+  borderRadius: 6,
+  padding: "6px 10px",
+  fontWeight: 900,
+  cursor: "pointer"
+};
+
 /* ---------------- COMPONENT ---------------- */
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -131,14 +139,14 @@ export default function Home() {
 
   const isDesktop = window.innerWidth >= 768;
 
-  /* 🔹 ACTIVE SESSION */
+  /* ACTIVE SESSION */
   useEffect(() => {
     getDoc(doc(db, "settings", "activeSession")).then(snap => {
       if (snap.exists()) setSession(snap.data().session_id);
     });
   }, []);
 
-  /* 🔹 SHOP OPEN / CLOSE */
+  /* SHOP OPEN / CLOSE */
   useEffect(() => {
     return onSnapshot(doc(db, "settings", "shop"), snap => {
       if (snap.exists()) {
@@ -148,7 +156,7 @@ export default function Home() {
     });
   }, []);
 
-  /* 🔹 MENU */
+  /* MENU */
   useEffect(() => {
     const q = query(
       collection(db, "menu"),
@@ -174,10 +182,7 @@ export default function Home() {
   const canSubmit = shopOpen && cart.length > 0 && name.trim() && phone.trim();
 
   async function submit() {
-    if (!shopOpen) {
-      alert("Shop is currently closed");
-      return;
-    }
+    if (!shopOpen) return alert("Shop is closed");
 
     await addDoc(collection(db, "orders"), {
       createdAt: serverTimestamp(),
@@ -207,19 +212,15 @@ export default function Home() {
           <button style={ui.cartBtn} onClick={() => setCartOpen(true)}>
             🛒 Cart {cart.length > 0 && <span style={ui.badge}>{cart.length}</span>}
           </button>
-          <button
-            style={ui.tokenBtn}
-            onClick={() => {
-              const ph = localStorage.getItem("myPhone");
-              ph ? setLocation(`/mytoken?phone=${ph}`) : alert("No previous order");
-            }}
-          >
+          <button style={ui.tokenBtn} onClick={() => {
+            const ph = localStorage.getItem("myPhone");
+            ph ? setLocation(`/mytoken?phone=${ph}`) : alert("No previous order");
+          }}>
             🎟 My Token
           </button>
         </div>
       </div>
 
-      {/* SHOP CLOSED BANNER */}
       {!shopOpen && (
         <div style={{ background: "#8b0000", color: "#fff", padding: 12, borderRadius: 8, marginBottom: 16, textAlign: "center" }}>
           🚫 {shopMessage}
@@ -234,38 +235,14 @@ export default function Home() {
             <div style={{ flex: 1 }} onClick={() => setItem(m)}>
               <b>{m.name}</b><br />₹{m.price}
             </div>
-            <button
-              style={{ ...ui.addBtn, opacity: shopOpen ? 1 : 0.4 }}
-              disabled={!shopOpen}
-              onClick={() => shopOpen && add(m)}
-            >
+            <button disabled={!shopOpen} style={{ ...ui.addBtn, opacity: shopOpen ? 1 : 0.4 }} onClick={() => shopOpen && add(m)}>
               + Add
             </button>
           </div>
         ))}
       </div>
 
-      {/* ITEM POPUP */}
-      {item && (
-        <div style={ui.overlay} onClick={() => setItem(null)}>
-          <div style={isDesktop ? ui.modalDesktop : ui.modalMobile} onClick={e => e.stopPropagation()}>
-            <button style={ui.closeBtn} onClick={() => setItem(null)}>✕</button>
-            <img src={item.img} style={isDesktop ? ui.modalImgDesktop : ui.modalImgMobile} />
-            <div style={ui.modalTitle}>{item.name}</div>
-            <div style={ui.modalDesc}>{item.desc || "Freshly prepared item"}</div>
-            <div style={ui.modalPrice}>₹{item.price}</div>
-            <button
-              style={{ ...ui.modalAdd, opacity: shopOpen ? 1 : 0.4 }}
-              disabled={!shopOpen}
-              onClick={() => { if (shopOpen) { add(item); setItem(null); } }}
-            >
-              Add to Cart
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* CART DRAWER */}
+      {/* CART */}
       {cartOpen && (
         <div style={ui.overlay} onClick={() => setCartOpen(false)}>
           <div style={{ position: "fixed", right: 0, top: 0, bottom: 0, width: "100%", maxWidth: 420, background: "#0f0f0f", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
@@ -276,8 +253,14 @@ export default function Home() {
 
             <div style={{ flex: 1, padding: 16 }}>
               {cart.map(i => (
-                <div key={i.id} style={{ marginBottom: 12 }}>
-                  <b>{i.name}</b> – ₹{i.price * i.qty}
+                <div key={i.id} style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <b>{i.name}</b><br />₹{i.price * i.qty}
+                  </div>
+                  <button style={qtyBtn} onClick={() => setCart(c => c.map(x => x.id === i.id ? { ...x, qty: x.qty - 1 } : x).filter(x => x.qty > 0))}>−</button>
+                  <b>{i.qty}</b>
+                  <button style={qtyBtn} onClick={() => setCart(c => c.map(x => x.id === i.id ? { ...x, qty: x.qty + 1 } : x))}>+</button>
+                  <button onClick={() => setCart(c => c.filter(x => x.id !== i.id))} style={{ background: "#8b0000", color: "#fff", border: "none", padding: "6px 10px", borderRadius: 6 }}>✕</button>
                 </div>
               ))}
             </div>
@@ -286,7 +269,7 @@ export default function Home() {
               <input placeholder="Your Name" value={name} onChange={e => setName(e.target.value)} style={{ width: "100%", padding: 12, marginBottom: 10 }} />
               <input placeholder="Phone Number" value={phone} onChange={e => setPhone(e.target.value)} style={{ width: "100%", padding: 12, marginBottom: 10 }} />
               <div style={{ fontWeight: 900 }}>Total: ₹{total}</div>
-              <button disabled={!canSubmit} onClick={submit} style={{ width: "100%", marginTop: 10, padding: 14, background: canSubmit ? "#ffd166" : "#444", borderRadius: 10 }}>
+              <button disabled={!canSubmit} onClick={submit} style={{ width: "100%", marginTop: 10, padding: 14, background: canSubmit ? "#2ecc71" : "#444", color: "#000", borderRadius: 10, fontWeight: 900 }}>
                 Place Order
               </button>
             </div>
