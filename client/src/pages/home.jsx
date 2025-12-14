@@ -242,16 +242,130 @@ export default function Home() {
       )}
 
       {/* CART DRAWER (UNCHANGED) */}
-      {cartOpen && (
-        <div style={ui.overlay} onClick={() => setCartOpen(false)}>
+{cartOpen && (
+  <div style={ui.overlay} onClick={() => setCartOpen(false)}>
+    <div
+      style={{
+        position: "fixed",
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: "100%",
+        maxWidth: 420,
+        background: "#0f0f0f",
+        display: "flex",
+        flexDirection: "column"
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      {/* HEADER */}
+      <div style={{ padding: 16, borderBottom: "1px solid #222", display: "flex", justifyContent: "space-between" }}>
+        <h3 style={{ margin: 0 }}>Your Cart</h3>
+        <button
+          onClick={() => setCartOpen(false)}
+          style={{ background: "none", color: "#fff", border: "none", fontSize: 20 }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* ITEMS */}
+      <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+        {cart.length === 0 && <p>Your cart is empty</p>}
+
+        {cart.map(i => (
           <div
-            style={{ position: "fixed", right: 0, top: 0, bottom: 0, width: "100%", maxWidth: 420, background: "#0f0f0f", display: "flex", flexDirection: "column" }}
-            onClick={e => e.stopPropagation()}
+            key={i.id}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto auto",
+              gap: 12,
+              alignItems: "center",
+              marginBottom: 14
+            }}
           >
-            {/* SAME cart UI as before */}
+            <div>
+              <b>{i.name}</b>
+              <div>₹{i.price * i.qty}</div>
+            </div>
+
+            <div>
+              <button onClick={() =>
+                setCart(c =>
+                  c.map(x => x.id === i.id ? { ...x, qty: x.qty - 1 } : x)
+                    .filter(x => x.qty > 0)
+                )
+              }>−</button>
+
+              <span style={{ margin: "0 8px" }}>{i.qty}</span>
+
+              <button onClick={() =>
+                setCart(c =>
+                  c.map(x => x.id === i.id ? { ...x, qty: x.qty + 1 } : x)
+                )
+              }>+</button>
+            </div>
+
+            <button
+              onClick={() => setCart(c => c.filter(x => x.id !== i.id))}
+              style={{
+                background: "#8b0000",
+                color: "#fff",
+                border: "none",
+                padding: "6px 10px",
+                borderRadius: 6,
+                fontWeight: 900,
+                cursor: "pointer"
+              }}
+            >
+              ✕
+            </button>
           </div>
+        ))}
+      </div>
+
+      {/* FOOTER */}
+      <div style={{ padding: 16, borderTop: "1px solid #222" }}>
+        <input
+          placeholder="Your Name"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          style={{ width: "100%", padding: 12, marginBottom: 10 }}
+        />
+
+        <input
+          placeholder="Phone Number"
+          value={phone}
+          onChange={e => setPhone(e.target.value)}
+          style={{ width: "100%", padding: 12, marginBottom: 10 }}
+        />
+
+        <div style={{ fontWeight: 900, marginBottom: 10 }}>
+          Total: ₹{total}
         </div>
-      )}
+
+        <button
+          disabled={!canSubmit}
+          onClick={submit}
+          style={{
+            width: "100%",
+            padding: 14,
+            background: canSubmit ? "#ffd166" : "#444",
+            color: "#111",
+            border: "none",
+            borderRadius: 10,
+            fontWeight: 900,
+            fontSize: 16,
+            cursor: canSubmit ? "pointer" : "not-allowed"
+          }}
+        >
+          Place Order
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
       <Footer />
     </div>
