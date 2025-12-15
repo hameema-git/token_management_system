@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { useShop } from "../context/ShopContext";
 import { db, serverTimestamp } from "../firebaseInit";
 import {
   collection,
@@ -15,23 +16,23 @@ import Footer from "../components/Footer";
 
 /* ---------------- STYLES ---------------- */
 const ui = {
-  page: { background: "#0b0b0b", color: "#f6e8c1", minHeight: "100vh", padding: 16 },
+  page: { background: "var(--bg)", color: "var(--text)", minHeight: "100vh", padding: 16 },
 
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  brand: { fontSize: 26, fontWeight: 900, color: "#ffd166" },
+  brand: { fontSize: 26, fontWeight: 900, color: "var(--primary)" },
   headerBtns: { display: "flex", gap: 12 },
 
   tokenBtn: {
     background: "transparent",
-    border: "1px solid #ffd166",
-    color: "#ffd166",
+    border: "1px solid var(--primary)",
+    color: "var(--primary)",
     padding: "8px 14px",
     borderRadius: 20,
     fontWeight: 700
   },
 
   cartBtn: {
-    background: "#ffd166",
+    background: "var(--primary)",
     color: "#111",
     border: "none",
     padding: "8px 14px",
@@ -54,7 +55,7 @@ const ui = {
   menuGrid: { display: "grid", gap: 14 },
   card: { display: "flex", gap: 14, padding: 12, background: "#111", borderRadius: 12, alignItems: "center" },
   img: { width: 80, height: 80, borderRadius: 10, objectFit: "cover", cursor: "pointer" },
-  addBtn: { background: "#ffd166", border: "none", padding: "8px 14px", borderRadius: 8, fontWeight: 800 },
+  addBtn: { background: "var(--primary)", border: "none", padding: "8px 14px", borderRadius: 8, fontWeight: 800 },
 
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", zIndex: 1000 },
 
@@ -88,7 +89,7 @@ const ui = {
   modalImgMobile: { width: "100%", height: 220, objectFit: "cover", borderRadius: 12 },
   modalImgDesktop: { width: "100%", height: 180, objectFit: "cover", borderRadius: 12 },
 
-  modalTitle: { fontSize: 22, fontWeight: 900, marginTop: 12, color: "#ffd166" },
+  modalTitle: { fontSize: 22, fontWeight: 900, marginTop: 12, color: "var(--primary)" },
   modalDesc: { marginTop: 8, color: "#bfb39a" },
   modalPrice: { marginTop: 12, fontSize: 20, fontWeight: 900 },
 
@@ -96,7 +97,7 @@ const ui = {
     marginTop: 16,
     width: "100%",
     padding: 14,
-    background: "#ffd166",
+    background: "var(--primary)",
     border: "none",
     borderRadius: 10,
     fontWeight: 900
@@ -114,7 +115,7 @@ const ui = {
 };
 
 const qtyBtn = {
-  background: "#ffd166",
+  background: "var(--primary)",
   border: "none",
   borderRadius: 6,
   padding: "6px 10px",
@@ -138,6 +139,8 @@ export default function Home() {
   const [shopMessage, setShopMessage] = useState("Shop is closed");
 
   const isDesktop = window.innerWidth >= 768;
+  const { shop } = useShop();
+  console.log("SHOP:", shop);
 
   /* ACTIVE SESSION */
   useEffect(() => {
@@ -207,7 +210,21 @@ export default function Home() {
     <div style={ui.page}>
       {/* HEADER */}
       <div style={ui.header}>
-        <div style={ui.brand}>Waffle Lounge</div>
+        {/* <div style={ui.brand}>Waffle Lounge</div> */}
+        const { shop } = useShop();
+
+<div style={ui.brand}>
+  {shop?.logoUrl ? (
+    <img
+      src={shop.logoUrl}
+      alt={shop.name}
+      style={{ height: 36, objectFit: "contain" }}
+    />
+  ) : (
+    shop?.name || "aaaaaaa"
+  )}
+</div>
+
         <div style={ui.headerBtns}>
           <button style={ui.cartBtn} onClick={() => setCartOpen(true)}>
             🛒 Cart {cart.length > 0 && <span style={ui.badge}>{cart.length}</span>}
