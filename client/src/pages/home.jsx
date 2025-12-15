@@ -209,37 +209,36 @@ export default function Home() {
   return (
     <div style={ui.page}>
       {/* HEADER */}
-      <div style={ui.header}>
-        {/* <div style={ui.brand}>Waffle Lounge</div> */}
-        const { shop } = useShop();
+     {/* HEADER */}
+<div style={ui.header}>
+  <div style={ui.brand}>
+    {shop?.logoUrl ? (
+      <img
+        src={shop.logoUrl}
+        alt={shop?.name || "Shop"}
+        style={{ height: 36, objectFit: "contain" }}
+      />
+    ) : (
+      shop?.name || "Waffle Lounge"
+    )}
+  </div>
 
-<div style={ui.brand}>
-  {shop?.logoUrl ? (
-    <img
-      src={shop.logoUrl}
-      alt={shop.name}
-      style={{ height: 36, objectFit: "contain" }}
-    />
-  ) : (
-    shop?.name || "aaaaaaa"
-  )}
+  <div style={ui.headerBtns}>
+    <button style={ui.cartBtn} onClick={() => setCartOpen(true)}>
+      🛒 Cart {cart.length > 0 && <span style={ui.badge}>{cart.length}</span>}
+    </button>
+
+    <button
+      style={ui.tokenBtn}
+      onClick={() => {
+        const ph = localStorage.getItem("myPhone");
+        ph ? setLocation(`/mytoken?phone=${ph}`) : alert("No previous order");
+      }}
+    >
+      🎟 My Token
+    </button>
+  </div>
 </div>
-
-        <div style={ui.headerBtns}>
-          <button style={ui.cartBtn} onClick={() => setCartOpen(true)}>
-            🛒 Cart {cart.length > 0 && <span style={ui.badge}>{cart.length}</span>}
-          </button>
-          <button
-            style={ui.tokenBtn}
-            onClick={() => {
-              const ph = localStorage.getItem("myPhone");
-              ph ? setLocation(`/mytoken?phone=${ph}`) : alert("No previous order");
-            }}
-          >
-            🎟 My Token
-          </button>
-        </div>
-      </div>
 
       {!shopOpen && (
         <div style={{ background: "#8b0000", color: "#fff", padding: 12, borderRadius: 8, marginBottom: 16, textAlign: "center" }}>

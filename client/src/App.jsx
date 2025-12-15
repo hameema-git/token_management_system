@@ -1,32 +1,73 @@
-// client/src/App.jsx
 import React from "react";
-import { Switch, Route } from "wouter";
-import PlaceOrder from "./pages/home.jsx";
+import { Route, Switch } from "wouter";
+import { useShop } from "./context/ShopContext";
+import useApplyTheme from "./hooks/useApplyTheme";
+
 import StaffDashboard from "./pages/staff.jsx";
-import TokenStatus from "./pages/status.jsx";
 import ApprovedOrders from "./pages/approved.jsx";
+import CompletedOrders from "./pages/Completed.jsx";
+import PaymentCenter from "./pages/PaymentCenter.jsx";
+import StaffLogin from "./pages/StaffLogin";
+import Kitchen from "./pages/Kitchen";
+import StaffPlaceOrder from "./pages/StaffPlaceOrder";
+import MenuManage from "./pages/MenuManage";
+import OwnerSummary from "./pages/OwnerSummary.jsx";
 
 export default function App() {
+  const { shop, loading } = useShop();
+
+  // ✅ APPLY THEME SAFELY
+  useApplyTheme(shop?.theme);
+
+  // optional loading guard
+  if (loading) return null;
+
   return (
     <Switch>
-      <Route path="/">
-        <PlaceOrder />
+      <Route path="/staff-login">
+        <StaffLogin />
       </Route>
 
       <Route path="/staff">
         <StaffDashboard />
       </Route>
 
-      <Route path="/mytoken">
-        <TokenStatus />
+      <Route path="/owner-summary">
+        <OwnerSummary />
       </Route>
-      <Route path="/approved">
-  <ApprovedOrders />
-</Route>
 
+      <Route path="/approved">
+        <ApprovedOrders />
+      </Route>
+
+      <Route path="/completed">
+        <CompletedOrders />
+      </Route>
+
+      <Route path="/payment">
+        <PaymentCenter />
+      </Route>
+
+      <Route path="/kitchen">
+        <Kitchen />
+      </Route>
+
+      <Route path="/staff-place-order">
+        <StaffPlaceOrder />
+      </Route>
+
+      <Route path="/menu-manage">
+        <MenuManage />
+      </Route>
+
+      <Route path="/">
+        <StaffLogin />
+      </Route>
 
       <Route>
-        <div>404 Page Not Found</div>
+        <div style={{ color: "white", padding: 20 }}>
+          404 - Not Found
+        </div>
       </Route>
     </Switch>
   );
