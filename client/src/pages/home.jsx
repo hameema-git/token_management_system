@@ -216,7 +216,11 @@ export default function Home() {
       <img
         src={shop.logoUrl}
         alt={shop?.name || "Shop"}
-        style={{ height: 36, objectFit: "contain" }}
+       style={{
+  height: window.innerWidth > 768 ? 56 : 44,
+  maxWidth: 160,
+  objectFit: "contain"
+}}
       />
     ) : (
       shop?.name || "Waffle Lounge"
