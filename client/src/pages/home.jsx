@@ -223,7 +223,7 @@ export default function Home() {
 }}
       />
     ) : (
-      shop?.name || "GO SIP WITH US"
+      shop?.name || "ABCD SHOP"
     )}
   </div>
 
