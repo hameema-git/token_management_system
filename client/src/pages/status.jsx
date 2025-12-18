@@ -11,175 +11,47 @@ import {
   getDoc,
   onSnapshot
 } from "firebase/firestore";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import Footer from "../components/Footer";
 
-/* ---------------- STYLES ---------------- */
-const styles = {
-  page: {
-    background: "#0b0b0b",
-    color: "#f6e8c1",
-    minHeight: "100vh",
-    padding: 20,
-    fontFamily: "'Segoe UI', Roboto, Arial, sans-serif"
-  },
-  container: { maxWidth: 720, margin: "auto" },
-
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 18
-  },
-  title: { fontSize: 22, fontWeight: 900, color: "#ffd166" },
-  subtitle: { color: "#bfb39a", fontSize: 13 },
-
-  inputRow: {
-    background: "#111",
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 18
-  },
-  input: {
-    width: "100%",
-    padding: 10,
-    borderRadius: 8,
-    border: "1px solid #222",
-    background: "#0c0c0c",
-    color: "#fff",
-    fontSize: 15
-  },
-  findBtn: {
-    marginTop: 8,
-    padding: "10px 14px",
-    background: "#ffd166",
-    color: "#111",
-    border: "none",
-    borderRadius: 8,
-    fontWeight: 800,
-    cursor: "pointer"
-  },
-
-  ticket: {
-    marginTop: 12,
-    padding: 20,
-    borderRadius: 12,
-    background: "#111",
-    borderLeft: "8px solid #ffd166",
-    display: "grid",
-    gap: 14
-  },
-
-  completedCard: {
-    marginTop: 20,
-    padding: 22,
-    borderRadius: 12,
-    background: "#111",
-    borderLeft: "8px solid #2ecc71",
-    textAlign: "center"
-  },
-
-  actionRowBottom: {
-    display: "flex",
-    gap: 12,
-    marginTop: 40,
-    flexWrap: "wrap"
-  },
-  btn: {
-    flex: 1,
-    padding: "14px 16px",
-    borderRadius: 8,
-    border: "none",
-    cursor: "pointer",
-    fontWeight: 800,
-    fontSize: 16
-  },
-  placeAnother: { background: "#222", color: "#ffd166" },
-  refreshBtn: { background: "#ffd166", color: "#111" },
-  rulesBtn: { background: "#333", color: "#ffd166" },
-
-  /* ---------- RULES MODAL ---------- */
-  overlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.7)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000
-  },
-  modal: {
-    background: "#111",
-    padding: 20,
-    borderRadius: 12,
-    maxWidth: 420,
-    width: "90%",
-    border: "2px solid #ffd166"
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 900,
-    color: "#ffd166",
-    marginBottom: 12
-  },
-  ruleText: {
-    fontSize: 14,
-    lineHeight: 1.6,
-    color: "#f6e8c1"
-  },
-  closeBtn: {
-    marginTop: 14,
-    width: "100%",
-    padding: "10px 12px",
-    background: "#ffd166",
-    color: "#111",
-    border: "none",
-    borderRadius: 8,
-    fontWeight: 800,
-    cursor: "pointer"
-  }
-};
-
-/* ---------------- COMPONENT ---------------- */
 export default function TokenStatus() {
-  const [, setLocation] = useLocation();
   const params = new URLSearchParams(window.location.search);
-
   const initialPhone =
     params.get("phone") || localStorage.getItem("myPhone") || "";
 
   const [phone, setPhone] = useState(initialPhone);
-  const [session, setSession] = useState(null);
   const [current, setCurrent] = useState(0);
+  const [activeOrder, setActiveOrder] = useState(null);
+  const [position, setPosition] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const [activeOrders, setActiveOrders] = useState([]);
-  const [completedOrders, setCompletedOrders] = useState([]);
-  const [showRules, setShowRules] = useState(false);
-
-  /* ---------------- Load active session ---------------- */
+  /* ---------------- LISTEN CURRENT TOKEN ---------------- */
   useEffect(() => {
-    async function loadSession() {
-      const ref = doc(db, "settings", "activeSession");
-      const snap = await getDoc(ref);
-      setSession(snap.exists() ? snap.data().session_id : "Session 1");
+    async function listenToken() {
+      const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
+      const session = sessionSnap.exists()
+        ? sessionSnap.data().session_id
+        : "Session 1";
+
+      return onSnapshot(
+        doc(db, "tokens", "session_" + session),
+        (snap) => {
+          if (snap.exists()) setCurrent(snap.data().currentToken || 0);
+        }
+      );
     }
-    loadSession();
+    listenToken();
   }, []);
 
-  /* ---------------- Listen current token ---------------- */
-  useEffect(() => {
-    if (!session) return;
-    const tokenRef = doc(db, "tokens", "session_" + session);
-    return onSnapshot(tokenRef, (snap) => {
-      if (snap.exists()) setCurrent(snap.data().currentToken || 0);
-    });
-  }, [session]);
-
-  /* ---------------- Load Orders ---------------- */
-  async function loadOrders() {
-    if (!phone || !session) return;
+  /* ---------------- LOAD ORDER ---------------- */
+  async function loadOrder() {
+    if (!phone) return;
     setLoading(true);
+
+    const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
+    const session = sessionSnap.exists()
+      ? sessionSnap.data().session_id
+      : "Session 1";
 
     const q = query(
       collection(db, "orders"),
@@ -189,139 +61,151 @@ export default function TokenStatus() {
     );
 
     const snap = await getDocs(q);
-    const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    setActiveOrders(all.filter(o => o.status !== "completed"));
-    setCompletedOrders(all.filter(o => o.status === "completed"));
+    if (!orders.length) {
+      setActiveOrder(null);
+      setPosition(null);
+      setLoading(false);
+      return;
+    }
+
+    const active = orders
+      .filter(o => o.status !== "completed")
+      .sort((a, b) => (a.token || 999) - (b.token || 999))[0];
+
+    setActiveOrder(active);
     setLoading(false);
   }
 
+  /* ---------------- CALCULATE POSITION (FIXED) ---------------- */
+  useEffect(() => {
+    if (!activeOrder || !activeOrder.token || !current) {
+      setPosition(null);
+      return;
+    }
+
+    async function calculatePosition() {
+      const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
+      const session = sessionSnap.exists()
+        ? sessionSnap.data().session_id
+        : "Session 1";
+
+      const q = query(
+        collection(db, "orders"),
+        where("session_id", "==", session),
+        where("status", "!=", "completed")
+      );
+
+      const snap = await getDocs(q);
+
+      const ahead = snap.docs
+        .map(d => d.data())
+        .filter(o =>
+          o.token &&
+          o.token > current &&
+          o.token < activeOrder.token
+        );
+
+      setPosition(ahead.length);
+    }
+
+    calculatePosition();
+  }, [activeOrder, current]);
+
   function handleFind() {
     localStorage.setItem("myPhone", phone);
-    loadOrders();
+    loadOrder();
   }
 
-  const mainOrder =
-    activeOrders.length > 0
-      ? [...activeOrders].sort((a, b) => a.token - b.token)[0]
-      : null;
+  /* ---------------- UI TEXT HELPERS ---------------- */
+  const waitText =
+    position === 0
+      ? "🎉 You're next!"
+      : position === 1
+      ? "Just 1 person before you 😊"
+      : `${position} people before you`;
 
-  /* ---------------- RENDER ---------------- */
+  const approxWait =
+    position != null ? `${position * 3}–${position * 5} mins` : null;
+
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
+    <div style={{ background: "#0b0b0b", color: "#f6e8c1", minHeight: "100vh", padding: 20 }}>
+      <div style={{ maxWidth: 720, margin: "auto" }}>
 
-        {/* HEADER */}
-        <div style={styles.header}>
-          <div>
-            <div style={styles.title}>Waffle Lounge — Token Status</div>
-            <div style={styles.subtitle}>Track your order in real time</div>
-          </div>
-          <div style={styles.subtitle}>Session: {session || "-"}</div>
-        </div>
+        <h2 style={{ color: "#ffd166" }}>Order Status</h2>
+        <p style={{ color: "#bfb39a" }}>Track your token in real time</p>
 
-        {/* SEARCH */}
-        <div style={styles.inputRow}>
-          <input
-            placeholder="Enter phone number"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            style={styles.input}
-          />
-          <button style={styles.findBtn} onClick={handleFind}>
-            Find
-          </button>
-        </div>
+        <input
+          placeholder="Enter phone number"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          style={{ width: "100%", padding: 10, borderRadius: 8, marginTop: 10 }}
+        />
 
-        {loading && <div style={{ textAlign: "center" }}>Loading…</div>}
+        <button onClick={handleFind} style={{ marginTop: 10, padding: 10 }}>
+          Find My Order
+        </button>
 
-        {/* ACTIVE ORDER */}
-        {mainOrder && (
-          <div style={styles.ticket}>
-            <div style={{ fontSize: 64, fontWeight: 900, textAlign: "center" }}>
-              TOKEN {mainOrder.token}
-            </div>
+        {loading && <p>Loading…</p>}
 
-            <div style={{ fontSize: 22, fontWeight: 800, textAlign: "center" }}>
-              Amount: ₹{Number(mainOrder.total).toFixed(2)}
-            </div>
-
-            <div style={{ fontSize: 22, fontWeight: 900, textAlign: "center" }}>
-              NOW SERVING — {current || "-"}
-            </div>
-
-            <div style={{ fontSize: 20, fontWeight: 800, textAlign: "center" }}>
-              Position: {mainOrder.token - current}
-            </div>
+        {/* NOT APPROVED */}
+        {activeOrder && !activeOrder.token && (
+          <div style={{ marginTop: 20 }}>
+            <h3>⏳ Waiting for approval</h3>
+            <p>Your order is being prepared for the queue.</p>
+            <p>
+              Payment:{" "}
+              <b>{activeOrder.paid ? "PAID ✅" : "UNPAID ⚠️"}</b>
+            </p>
           </div>
         )}
 
-        {/* COMPLETED STATE */}
-        {!mainOrder && completedOrders.length > 0 && (
-          <div style={styles.completedCard}>
-            <div style={{ fontSize: 26, fontWeight: 900, color: "#2ecc71" }}>
-              ✅ Order Completed
+        {/* ACTIVE TOKEN */}
+        {activeOrder && activeOrder.token && (
+          <div style={{ marginTop: 20, textAlign: "center" }}>
+            <div style={{ fontSize: 64, fontWeight: 900, color: "#ffd166" }}>
+              TOKEN {activeOrder.token}
             </div>
-            <div style={{ marginTop: 10, fontSize: 18 }}>
-              Please collect your order at the counter
-            </div>
-            <div style={{ marginTop: 12, color: "#bfb39a" }}>
-              Thank you for visiting Waffle Lounge 🍰
-            </div>
+
+            <p>Now Serving: <b>{current || "-"}</b></p>
+
+            {position != null && (
+              <>
+                <p style={{ fontSize: 18 }}>{waitText}</p>
+                <p style={{ color: "#bfb39a" }}>
+                  ⏱️ Approx wait time: {approxWait}
+                </p>
+              </>
+            )}
+
+            <p>
+              Payment Status:{" "}
+              <b>{activeOrder.paid ? "PAID ✅" : "UNPAID ⚠️"}</b>
+            </p>
           </div>
         )}
 
-        {/* ACTION BUTTONS */}
-        <div style={styles.actionRowBottom}>
+        {/* FRIENDLY NOTE */}
+        <div style={{ marginTop: 30, fontSize: 13, color: "#bfb39a" }}>
+          <p><b>Please note:</b></p>
+          <ul>
+            <li>If your token is skipped, please come to the counter when called.</li>
+            <li>Skipped tokens are served after the current order completes.</li>
+            <li>Being nearby helps us serve you faster 😊</li>
+          </ul>
+        </div>
+
+        <div style={{ marginTop: 30 }}>
           <Link href="/">
-            <button style={{ ...styles.btn, ...styles.placeAnother }}>
-              Back To Menu
-            </button>
+            <button>Back to Menu</button>
           </Link>
-
-          <button
-            style={{ ...styles.btn, ...styles.refreshBtn }}
-            onClick={loadOrders}
-          >
-            Refresh
-          </button>
-
-          <button
-            style={{ ...styles.btn, ...styles.rulesBtn }}
-            onClick={() => setShowRules(true)}
-          >
-            Rules
-          </button>
         </div>
 
         <Footer />
       </div>
-
-      {/* RULES POPUP */}
-      {showRules && (
-        <div style={styles.overlay} onClick={() => setShowRules(false)}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalTitle}>Token Rules</div>
-
-            <div style={styles.ruleText}>
-              • <b>Token</b> — Your order number<br />
-              • <b>Now Serving</b> — Token currently being prepared<br />
-              • <b>Position</b> — Tokens ahead of you<br />
-              • <b>Position = 0</b> — Please go to the counter now<br />
-              • <b>Negative position</b> — Your token was skipped earlier<br />
-              • Completed orders are removed automatically
-            </div>
-
-            <button
-              style={styles.closeBtn}
-              onClick={() => setShowRules(false)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+
 
