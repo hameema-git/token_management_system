@@ -10,113 +10,43 @@ import {
   getDoc,
   onSnapshot
 } from "firebase/firestore";
+import { Link } from "wouter";
 import Footer from "../components/Footer";
 
-const styles = {
-  page: {
-    background: "#0b0b0b",
-    color: "#f6e8c1",
-    minHeight: "100vh",
-    padding: 20
-  },
-  container: { maxWidth: 720, margin: "auto" },
-
-  header: { marginBottom: 20, textAlign: "center" },
-  logo: { fontSize: 26, fontWeight: 900, color: "#ffd166" },
-  subtitle: { color: "#bfb39a", fontSize: 13 },
-
-  inputRow: {
-    background: "#111",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20
-  },
-  input: {
-    width: "100%",
-    padding: 12,
-    borderRadius: 10,
-    border: "1px solid #222",
-    background: "#0c0c0c",
-    color: "#fff",
-    fontSize: 16
-  },
-  findBtn: {
-    marginTop: 10,
-    width: "100%",
-    padding: 12,
-    background: "#ffd166",
-    color: "#111",
-    border: "none",
-    borderRadius: 10,
-    fontWeight: 900,
-    fontSize: 15
-  },
-
-  card: {
-    marginTop: 16,
-    padding: 22,
-    borderRadius: 14,
-    background: "#111",
-    borderLeft: "8px solid #ffd166",
-    textAlign: "center"
-  },
-
-  token: {
-    fontSize: 64,
-    fontWeight: 900,
-    color: "#ffd166"
-  },
-
-  badgePaid: { color: "#2ecc71", fontWeight: 800 },
-  badgeUnpaid: { color: "#ffb86b", fontWeight: 800 },
-
-  infoBtn: {
-    marginTop: 14,
-    background: "#222",
-    color: "#ffd166",
-    border: "none",
-    borderRadius: 8,
-    padding: "8px 12px",
-    cursor: "pointer",
-    fontWeight: 700
-  },
-
-  infoBox: {
-    marginTop: 14,
-    padding: 14,
-    background: "#0f0f0f",
-    borderRadius: 10,
-    textAlign: "left",
-    fontSize: 13,
-    color: "#ccc"
-  }
-};
-
 export default function TokenStatus() {
-  const [phone, setPhone] = useState(localStorage.getItem("myPhone") || "");
+  const params = new URLSearchParams(window.location.search);
+  const initialPhone =
+    params.get("phone") || localStorage.getItem("myPhone") || "";
+
+  const [phone, setPhone] = useState(initialPhone);
   const [current, setCurrent] = useState(0);
   const [activeOrder, setActiveOrder] = useState(null);
+  const [completed, setCompleted] = useState(false);
   const [position, setPosition] = useState(null);
-  const [showInfo, setShowInfo] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const [showItems, setShowItems] = useState(false);
 
-  /* ---- listen current token ---- */
+  /* 🔴 LIVE CURRENT TOKEN */
   useEffect(() => {
     async function listenToken() {
-      const snap = await getDoc(doc(db, "settings", "activeSession"));
-      const session = snap.exists() ? snap.data().session_id : "Session 1";
+      const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
+      const session = sessionSnap.exists()
+        ? sessionSnap.data().session_id
+        : "Session 1";
 
-      return onSnapshot(doc(db, "tokens", "session_" + session), s => {
-        if (s.exists()) setCurrent(s.data().currentToken || 0);
+      return onSnapshot(doc(db, "tokens", "session_" + session), snap => {
+        if (snap.exists()) setCurrent(snap.data().currentToken || 0);
       });
     }
     listenToken();
   }, []);
 
-  /* ---- load order ---- */
+  /* 🔍 LOAD ORDER */
   async function loadOrder() {
     if (!phone) return;
     setLoading(true);
+
     localStorage.setItem("myPhone", phone);
 
     const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
@@ -134,19 +64,38 @@ export default function TokenStatus() {
     const snap = await getDocs(q);
     const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    const active = orders.find(o => o.status !== "completed") || null;
+    if (!orders.length) {
+      setActiveOrder(null);
+      setCompleted(false);
+      setLoading(false);
+      return;
+    }
+
+    const completedOrders = orders.filter(o => o.status === "completed");
+    if (completedOrders.length === orders.length) {
+      setCompleted(true);
+      setActiveOrder(null);
+      setLoading(false);
+      return;
+    }
+
+    const active = orders
+      .filter(o => o.status !== "completed")
+      .sort((a, b) => (a.token || 999) - (b.token || 999))[0];
+
     setActiveOrder(active);
+    setCompleted(false);
     setLoading(false);
   }
 
-  /* ---- correct position calculation ---- */
+  /* 📍 POSITION CALCULATION (CORRECT LOGIC) */
   useEffect(() => {
-    if (!activeOrder || !activeOrder.token || !current) {
+    if (!activeOrder?.token || !current) {
       setPosition(null);
       return;
     }
 
-    async function calc() {
+    async function calcPosition() {
       const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
       const session = sessionSnap.exists()
         ? sessionSnap.data().session_id
@@ -155,104 +104,200 @@ export default function TokenStatus() {
       const q = query(
         collection(db, "orders"),
         where("session_id", "==", session),
-        where("status", "!=", "completed")
+        where("status", "in", ["approved", "paid"])
       );
 
       const snap = await getDocs(q);
+
       const ahead = snap.docs
         .map(d => d.data())
-        .filter(o =>
-          o.token &&
-          o.token > current &&
-          o.token < activeOrder.token
-        );
+        .filter(o => o.token > current && o.token < activeOrder.token);
 
       setPosition(ahead.length);
     }
 
-    calc();
+    calcPosition();
   }, [activeOrder, current]);
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <div style={styles.logo}>🍫 Waffle Lounge</div>
-          <div style={styles.subtitle}>Live Order & Token Status</div>
+    <div style={{ background: "#0b0b0b", minHeight: "100vh", color: "#f6e8c1", padding: 20 }}>
+      <div style={{ maxWidth: 720, margin: "auto" }}>
+
+        {/* HEADER */}
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <img src="/logo.png" alt="Shop Logo" style={{ height: 50 }} />
+          <h2 style={{ color: "#ffd166", marginTop: 8 }}>Waffle Lounge</h2>
+          <div style={{ color: "#bfb39a" }}>Live Order Status</div>
         </div>
 
-        <div style={styles.inputRow}>
+        {/* SEARCH */}
+        <div style={{ background: "#111", padding: 16, borderRadius: 12 }}>
           <input
-            placeholder="Enter your phone number"
+            placeholder="Enter phone number"
             value={phone}
             onChange={e => setPhone(e.target.value)}
-            style={styles.input}
+            style={{
+              width: "100%",
+              padding: 12,
+              borderRadius: 8,
+              border: "1px solid #222",
+              background: "#0c0c0c",
+              color: "#fff"
+            }}
           />
-          <button onClick={loadOrder} style={styles.findBtn}>
-            Track My Order
+          <button
+            onClick={loadOrder}
+            style={{
+              marginTop: 10,
+              width: "100%",
+              padding: 12,
+              background: "#ffd166",
+              border: "none",
+              borderRadius: 8,
+              fontWeight: 800
+            }}
+          >
+            Find My Order
           </button>
         </div>
 
-        {loading && <div style={{ textAlign: "center" }}>Loading…</div>}
+        {loading && <div style={{ textAlign: "center", marginTop: 20 }}>Loading…</div>}
 
-        {/* Waiting for approval */}
-        {activeOrder && !activeOrder.token && (
-          <div style={styles.card}>
-            <div style={{ fontSize: 22, fontWeight: 900 }}>⏳ Waiting for approval</div>
-            <div style={{ marginTop: 8 }}>
-              Payment:{" "}
-              <span style={activeOrder.paid ? styles.badgePaid : styles.badgeUnpaid}>
-                {activeOrder.paid ? "PAID" : "UNPAID"}
-              </span>
-            </div>
+        {/* WAITING FOR APPROVAL */}
+        {activeOrder && activeOrder.status === "pending" && (
+          <div style={cardStyle}>
+            <h2>⏳ Waiting for Approval</h2>
+            <p>Your order is being reviewed by staff</p>
+            <p>Payment: <b>{activeOrder.paid ? "PAID" : "UNPAID"}</b></p>
           </div>
         )}
 
-        {/* Active token */}
-        {activeOrder && activeOrder.token && (
-          <div style={styles.card}>
-            <div style={styles.token}>TOKEN {activeOrder.token}</div>
+        {/* TOKEN CARD */}
+        {activeOrder?.token && (
+          <div style={cardStyle}>
+            <div style={{ fontSize: 60, fontWeight: 900, color: "#ffd166" }}>
+              TOKEN {activeOrder.token}
+            </div>
 
-            <div style={{ marginTop: 8 }}>
+            <div style={{ marginTop: 10 }}>
               Now Serving: <b>{current || "-"}</b>
             </div>
 
-            {Number.isFinite(position) && (
-              <div style={{ marginTop: 6 }}>
-                {position === 0
-                  ? "🎉 You’re next!"
-                  : `👥 ${position} people before you`}
+            {position === 0 && (
+              <div style={{ marginTop: 10, fontSize: 18 }}>
+                🎉 <b>You’re next! Please come near the counter</b>
+              </div>
+            )}
+
+            {position > 0 && (
+              <div style={{ marginTop: 10 }}>
+                👥 <b>{position}</b> people before you
               </div>
             )}
 
             <div style={{ marginTop: 10 }}>
-              Payment:{" "}
-              <span style={activeOrder.paid ? styles.badgePaid : styles.badgeUnpaid}>
-                {activeOrder.paid ? "PAID" : "UNPAID"}
-              </span>
+              Amount: ₹{Number(activeOrder.total || 0).toFixed(2)}
             </div>
 
-            <button
-              style={styles.infoBtn}
-              onClick={() => setShowInfo(v => !v)}
-            >
-              ℹ️ How this works
+            <div style={{ marginTop: 6 }}>
+              Payment: <b>{activeOrder.paid ? "PAID ✅" : "UNPAID ⚠️"}</b>
+            </div>
+
+            <button onClick={() => setShowItems(true)} style={smallBtn}>
+              View Ordered Items
             </button>
 
-            {showInfo && (
-              <div style={styles.infoBox}>
-                • Please be near the counter when your token is close<br />
-                • If a customer is not present, staff may continue serving others<br />
-                • Skipped tokens are served once the customer returns<br />
-                • Service continues after the current order is completed
-              </div>
-            )}
+            <button onClick={() => setShowInfo(true)} style={infoBtn}>
+              ⓘ How this works
+            </button>
           </div>
         )}
 
+        {/* COMPLETED */}
+        {completed && (
+          <div style={{ ...cardStyle, borderLeft: "8px solid #2ecc71" }}>
+            <h2>✅ Order Completed</h2>
+            <p>Please collect your order at the counter</p>
+          </div>
+        )}
+
+        <Link href="/">
+          <button style={{ marginTop: 20, ...smallBtn }}>⬅ Back to Menu</button>
+        </Link>
+
         <Footer />
+      </div>
+
+      {/* INFO MODAL */}
+      {showInfo && (
+        <Modal onClose={() => setShowInfo(false)} title="Order Info">
+          <ul>
+            <li>Tokens are served in order</li>
+            <li>Skipped tokens do not affect your position</li>
+            <li>If skipped, please wait near the counter</li>
+            <li>Position may change slightly in live situations</li>
+          </ul>
+        </Modal>
+      )}
+
+      {/* ITEMS MODAL */}
+      {showItems && (
+        <Modal onClose={() => setShowItems(false)} title="Your Order">
+          {(activeOrder.items || []).map((i, idx) => (
+            <div key={idx}>
+              {i.quantity} × {i.name}
+            </div>
+          ))}
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* STYLES */
+const cardStyle = {
+  marginTop: 20,
+  background: "#111",
+  padding: 20,
+  borderRadius: 12,
+  borderLeft: "8px solid #ffd166",
+  textAlign: "center"
+};
+
+const smallBtn = {
+  marginTop: 12,
+  padding: "10px 14px",
+  background: "#222",
+  color: "#ffd166",
+  border: "none",
+  borderRadius: 8,
+  fontWeight: 800
+};
+
+const infoBtn = {
+  ...smallBtn,
+  background: "#333"
+};
+
+/* MODAL */
+function Modal({ title, children, onClose }) {
+  return (
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.6)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 9999
+    }}>
+      <div style={{ background: "#111", padding: 20, borderRadius: 12, width: "90%", maxWidth: 400 }}>
+        <h3 style={{ color: "#ffd166" }}>{title}</h3>
+        {children}
+        <button onClick={onClose} style={smallBtn}>Close</button>
       </div>
     </div>
   );
 }
+
 
