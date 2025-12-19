@@ -1,4 +1,4 @@
-// client/src/pages/TokenStatus.jsx
+// client/src/pages/status.jsx
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseInit";
 import {
@@ -14,6 +14,102 @@ import {
 import { Link } from "wouter";
 import Footer from "../components/Footer";
 
+/* ---------------- STYLES ---------------- */
+const styles = {
+  page: {
+    background: "#0b0b0b",
+    color: "#f6e8c1",
+    minHeight: "100vh",
+    padding: 20
+  },
+  container: {
+    maxWidth: 720,
+    margin: "auto"
+  },
+  header: {
+    marginBottom: 18
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 900,
+    color: "#ffd166"
+  },
+  subtitle: {
+    color: "#bfb39a",
+    fontSize: 13
+  },
+  inputRow: {
+    background: "#111",
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 18
+  },
+  input: {
+    width: "100%",
+    padding: 10,
+    borderRadius: 8,
+    border: "1px solid #222",
+    background: "#0c0c0c",
+    color: "#fff"
+  },
+  findBtn: {
+    marginTop: 8,
+    padding: "10px 14px",
+    background: "#ffd166",
+    color: "#111",
+    border: "none",
+    borderRadius: 8,
+    fontWeight: 800,
+    cursor: "pointer"
+  },
+  card: {
+    marginTop: 14,
+    padding: 20,
+    borderRadius: 12,
+    background: "#111",
+    borderLeft: "8px solid #ffd166",
+    textAlign: "center"
+  },
+  completedCard: {
+    marginTop: 20,
+    padding: 22,
+    borderRadius: 12,
+    background: "#111",
+    borderLeft: "8px solid #2ecc71",
+    textAlign: "center"
+  },
+  statusPaid: {
+    color: "#2ecc71",
+    fontWeight: 800
+  },
+  statusUnpaid: {
+    color: "#ffb86b",
+    fontWeight: 800
+  },
+  bottomRow: {
+    display: "flex",
+    gap: 12,
+    marginTop: 40
+  },
+  btn: {
+    flex: 1,
+    padding: "14px",
+    borderRadius: 8,
+    border: "none",
+    fontWeight: 800,
+    cursor: "pointer"
+  },
+  backBtn: {
+    background: "#222",
+    color: "#ffd166"
+  },
+  refreshBtn: {
+    background: "#ffd166",
+    color: "#111"
+  }
+};
+
+/* ---------------- COMPONENT ---------------- */
 export default function TokenStatus() {
   const params = new URLSearchParams(window.location.search);
   const initialPhone =
@@ -21,232 +117,192 @@ export default function TokenStatus() {
 
   const [phone, setPhone] = useState(initialPhone);
   const [current, setCurrent] = useState(0);
-  const [orders, setOrders] = useState([]);
-  const [positionMap, setPositionMap] = useState({});
   const [loading, setLoading] = useState(false);
-  const [showItems, setShowItems] = useState(null);
-  const [showInfo, setShowInfo] = useState(false);
+  const [activeOrder, setActiveOrder] = useState(null);
+  const [completed, setCompleted] = useState(false);
 
-  /* 🔴 CURRENT SERVING TOKEN (DISPLAY ONLY) */
+  /* -------- CURRENT TOKEN LISTENER -------- */
   useEffect(() => {
-    let unsub = null;
+    let unsubscribe;
 
-    async function listenCurrent() {
-      const s = await getDoc(doc(db, "settings", "activeSession"));
-      const session = s.exists() ? s.data().session_id : "Session 1";
+    async function listenToken() {
+      const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
+      const session = sessionSnap.exists()
+        ? sessionSnap.data().session_id
+        : "Session 1";
 
-      unsub = onSnapshot(
-        doc(db, "tokens", "session_" + session),
-        snap => {
-          if (snap.exists()) setCurrent(snap.data().currentToken || 0);
+      const tokenRef = doc(db, "tokens", "session_" + session);
+      unsubscribe = onSnapshot(tokenRef, (snap) => {
+        if (snap.exists()) {
+          setCurrent(snap.data().currentToken || 0);
         }
-      );
+      });
     }
 
-    listenCurrent();
-    return () => unsub && unsub();
+    listenToken();
+    return () => unsubscribe && unsubscribe();
   }, []);
 
-  /* 🔍 LOAD ALL NON-COMPLETED ORDERS FOR PHONE */
-  useEffect(() => {
+  /* -------- LOAD USER ORDER -------- */
+  async function loadOrder() {
     if (!phone) return;
-
     setLoading(true);
+
+    const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
+    const session = sessionSnap.exists()
+      ? sessionSnap.data().session_id
+      : "Session 1";
+
+    const q = query(
+      collection(db, "orders"),
+      where("phone", "==", String(phone)),
+      where("session_id", "==", session),
+      orderBy("createdAt", "asc")
+    );
+
+    const snap = await getDocs(q);
+    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    if (!orders.length) {
+      setActiveOrder(null);
+      setCompleted(false);
+      setLoading(false);
+      return;
+    }
+
+    const completedOrders = orders.filter(o => o.status === "completed");
+    if (completedOrders.length === orders.length) {
+      setCompleted(true);
+      setActiveOrder(null);
+      setLoading(false);
+      return;
+    }
+
+    const active = orders
+      .filter(o => o.status !== "completed")
+      .sort((a, b) => (a.token || 999) - (b.token || 999))[0];
+
+    setActiveOrder(active);
+    setCompleted(false);
+    setLoading(false);
+  }
+
+  function handleFind() {
     localStorage.setItem("myPhone", phone);
+    loadOrder();
+  }
 
-    let unsub = null;
+  const position =
+    activeOrder && current && activeOrder.token
+      ? activeOrder.token - current
+      : null;
 
-    async function listenOrders() {
-      const s = await getDoc(doc(db, "settings", "activeSession"));
-      const session = s.exists() ? s.data().session_id : "Session 1";
-
-      const q = query(
-        collection(db, "orders"),
-        where("phone", "==", phone),
-        where("session_id", "==", session),
-        where("status", "!=", "completed"),
-        orderBy("queueOrder", "asc")
-      );
-
-      unsub = onSnapshot(q, snap => {
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setOrders(list);
-        setLoading(false);
-      });
-    }
-
-    listenOrders();
-    return () => unsub && unsub();
-  }, [phone]);
-
-  /* 📍 POSITION CALCULATION (NO CURRENT-TOKEN MATH) */
-  useEffect(() => {
-    async function calcPositions() {
-      if (!orders.length) {
-        setPositionMap({});
-        return;
-      }
-
-      const s = await getDoc(doc(db, "settings", "activeSession"));
-      const session = s.exists() ? s.data().session_id : "Session 1";
-
-      const q = query(
-        collection(db, "orders"),
-        where("session_id", "==", session),
-        where("status", "!=", "completed")
-      );
-
-      const snap = await getDocs(q);
-      const allActive = snap.docs.map(d => d.data());
-
-      const map = {};
-      orders.forEach(o => {
-        map[o.id] = allActive.filter(
-          x => x.queueOrder < o.queueOrder
-        ).length;
-      });
-
-      setPositionMap(map);
-    }
-
-    calcPositions();
-  }, [orders]);
-
-  const currentOrder = orders.find(o => o.status !== "skipped");
-  const isImmediate =
-    currentOrder &&
-    (currentOrder.status === "called" ||
-      currentOrder.status === "serving");
-
+  /* ---------------- UI ---------------- */
   return (
-    <div style={{ ...page, ...(isImmediate ? urgentBg : {}) }}>
-      <div style={container}>
-
-        {/* HEADER */}
-        <div style={header}>
-          <img src="/logo.png" alt="Logo" style={{ height: 50 }} />
-          <h2 style={{ color: "#ffd166" }}>ABC SHOP</h2>
-          <div style={{ color: "#bfb39a" }}>Live Order Status</div>
+    <div style={styles.page}>
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div style={styles.title}>Waffle Lounge — Order Status</div>
+          <div style={styles.subtitle}>Track your order in real time</div>
         </div>
 
-        {/* SEARCH */}
-        <div style={searchBox}>
+        <div style={styles.inputRow}>
           <input
-            value={phone}
-            onChange={e => setPhone(e.target.value)}
             placeholder="Enter phone number"
-            style={input}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            style={styles.input}
           />
+          <button style={styles.findBtn} onClick={handleFind}>
+            Find Order
+          </button>
         </div>
 
         {loading && <div style={{ textAlign: "center" }}>Loading…</div>}
 
-        {/* 🔁 ALL TOKENS FOR THIS PHONE */}
-        {orders.map(o => (
-          <div
-            key={o.id}
-            style={{
-              ...card,
-              borderLeft:
-                o.status === "skipped"
-                  ? "8px solid #ff7a00"
-                  : "8px solid #ffd166"
-            }}
-          >
-            <div style={tokenNumber}>TOKEN {o.token}</div>
-
-            <div>Now Serving: <b>{current || "-"}</b></div>
-
-            {/* SKIPPED INFO */}
-            {o.status === "skipped" && (
-              <p style={{ marginTop: 8 }}>
-                ⚠ Your order was skipped.  
-                Please go to the counter and wait.
-              </p>
-            )}
-
-            {/* POSITION */}
-            {positionMap[o.id] !== undefined && (
-              <div style={{ marginTop: 8 }}>
-                {positionMap[o.id] === 0
-                  ? "You are next"
-                  : `${positionMap[o.id]} people before you`}
-              </div>
-            )}
-
-            <div style={{ marginTop: 8 }}>
-              Amount: ₹{Number(o.total || 0).toFixed(2)}
+        {/* WAITING */}
+        {activeOrder && activeOrder.status === "pending" && (
+          <div style={styles.card}>
+            <div style={{ fontSize: 24, fontWeight: 900 }}>⏳ Waiting</div>
+            <div style={{ marginTop: 10, color: "#bfb39a" }}>
+              Your order is waiting for approval
             </div>
-
-            <button style={btn} onClick={() => setShowItems(o)}>
-              View items
-            </button>
-          </div>
-        ))}
-
-        {!orders.length && !loading && (
-          <div style={card}>
-            <h3>No active orders</h3>
-            <p>Please place an order from the menu</p>
+            <div style={{ marginTop: 10 }}>
+              Payment:{" "}
+              <span
+                style={
+                  activeOrder.paid
+                    ? styles.statusPaid
+                    : styles.statusUnpaid
+                }
+              >
+                {activeOrder.paid ? "PAID" : "UNPAID"}
+              </span>
+            </div>
           </div>
         )}
 
-        <button style={btn} onClick={() => setShowInfo(true)}>
-          How this works
-        </button>
+        {/* ACTIVE TOKEN */}
+        {activeOrder && activeOrder.token && (
+          <div style={styles.card}>
+            <div style={{ fontSize: 64, fontWeight: 900 }}>
+              TOKEN {activeOrder.token}
+            </div>
 
-        <Link href="/">
-          <button style={btn}>Back to Menu</button>
-        </Link>
+            <div style={{ marginTop: 10, fontSize: 18 }}>
+              Now Serving: <b>{current || "-"}</b>
+            </div>
+
+            {Number.isFinite(position) && (
+              <div style={{ marginTop: 6, fontSize: 18 }}>
+                Position: <b>{position}</b>
+              </div>
+            )}
+
+            <div style={{ marginTop: 10 }}>
+              Payment:{" "}
+              <span
+                style={
+                  activeOrder.paid
+                    ? styles.statusPaid
+                    : styles.statusUnpaid
+                }
+              >
+                {activeOrder.paid ? "PAID" : "UNPAID"}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* COMPLETED */}
+        {completed && (
+          <div style={styles.completedCard}>
+            <div style={{ fontSize: 26, fontWeight: 900, color: "#2ecc71" }}>
+              ✅ Order Completed
+            </div>
+            <div style={{ marginTop: 10 }}>
+              Please collect your order at the counter
+            </div>
+          </div>
+        )}
+
+        <div style={styles.bottomRow}>
+          <Link href="/">
+            <button style={{ ...styles.btn, ...styles.backBtn }}>
+              Back to Menu
+            </button>
+          </Link>
+
+          <button
+            style={{ ...styles.btn, ...styles.refreshBtn }}
+            onClick={loadOrder}
+          >
+            Refresh
+          </button>
+        </div>
 
         <Footer />
       </div>
-
-      {/* ITEMS MODAL */}
-      {showItems && (
-        <Modal onClose={() => setShowItems(null)}>
-          {(showItems.items || []).map((i, idx) => (
-            <div key={idx}>
-              {i.quantity} × {i.name}
-            </div>
-          ))}
-        </Modal>
-      )}
-
-      {/* INFO MODAL */}
-      {showInfo && (
-        <Modal onClose={() => setShowInfo(false)}>
-          <p>• Tokens are served in order</p>
-          <p>• If you miss your call, your order may be skipped</p>
-          <p>• Skipped orders are handled by staff</p>
-          <p>• Your turn is never cancelled</p>
-        </Modal>
-      )}
     </div>
   );
 }
-
-/* STYLES */
-const page = { background: "#0b0b0b", minHeight: "100vh", color: "#f6e8c1", padding: 20 };
-const urgentBg = { background: "#7a0000", animation: "pulse 1s infinite" };
-const container = { maxWidth: 720, margin: "auto" };
-const header = { textAlign: "center", marginBottom: 20 };
-const searchBox = { background: "#111", padding: 16, borderRadius: 12 };
-const input = { width: "100%", padding: 12, background: "#0c0c0c", color: "#fff", borderRadius: 8, border: "1px solid #222" };
-const card = { marginTop: 20, background: "#111", padding: 20, borderRadius: 12, textAlign: "center" };
-const tokenNumber = { fontSize: 44, fontWeight: 900, color: "#ffd166" };
-const btn = { marginTop: 10, padding: "10px 14px", background: "#222", color: "#ffd166", border: "none", borderRadius: 8, fontWeight: 800 };
-
-function Modal({ children, onClose }) {
-  return (
-    <div style={modalBg}>
-      <div style={modal}>
-        {children}
-        <button style={btn} onClick={onClose}>Close</button>
-      </div>
-    </div>
-  );
-}
-
-const modalBg = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" };
-const modal = { background: "#111", padding: 20, borderRadius: 12, width: "90%", maxWidth: 400 };
