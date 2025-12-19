@@ -1,125 +1,288 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { db } from "../firebaseInit";
 import {
-  doc,
+  query,
   collection,
+  where,
+  orderBy,
+  getDocs,
+  doc,
+  getDoc,
   onSnapshot
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { Link } from "wouter";
+import Footer from "../components/Footer";
 
-/* =========================
-   QUEUE POSITION LOGIC
-   ========================= */
-function calculatePosition(allTokens, myToken) {
-  if (!myToken) return null;
+export default function TokenStatus() {
+  const params = new URLSearchParams(window.location.search);
+  const initialPhone =
+    params.get("phone") || localStorage.getItem("myPhone") || "";
 
-  if (myToken.status === "completed") return null;
-  if (myToken.status === "skipped") return null;
+  const [phone, setPhone] = useState(initialPhone);
+  const [current, setCurrent] = useState(0);
+  const [activeOrder, setActiveOrder] = useState(null);
+  const [completed, setCompleted] = useState(false);
+  const [position, setPosition] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [showItems, setShowItems] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
-  return allTokens.filter(
-    t =>
-      ["waiting", "called", "serving"].includes(t.status) &&
-      t.queueOrder < myToken.queueOrder
-  ).length;
-}
-
-/* =========================
-   STATUS PAGE
-   ========================= */
-export default function Status({ tokenId }) {
-  const [shop, setShop] = useState(null);
-  const [token, setToken] = useState(null);
-  const [tokens, setTokens] = useState([]);
-
+  /* 🔴 LIVE CURRENT TOKEN */
   useEffect(() => {
-    const unsubShop = onSnapshot(
-      doc(db, "settings", "shop"),
-      snap => setShop(snap.data())
-    );
+    let unsub = null;
 
-    const unsubToken = onSnapshot(
-      doc(db, "tokens", tokenId),
-      snap => setToken({ id: snap.id, ...snap.data() })
-    );
+    async function listenToken() {
+      const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
+      const session = sessionSnap.exists()
+        ? sessionSnap.data().session_id
+        : "Session 1";
 
-    const unsubTokens = onSnapshot(
-      collection(db, "tokens"),
-      snap =>
-        setTokens(
-          snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        )
-    );
+      unsub = onSnapshot(
+        doc(db, "tokens", "session_" + session),
+        snap => {
+          if (snap.exists()) setCurrent(snap.data().currentToken || 0);
+        }
+      );
+    }
 
-    return () => {
-      unsubShop();
-      unsubToken();
-      unsubTokens();
-    };
-  }, [tokenId]);
+    listenToken();
+    return () => unsub && unsub();
+  }, []);
 
-  if (!shop || !token) return null;
+  /* 🔍 LOAD CUSTOMER ORDER */
+  useEffect(() => {
+    if (!phone) return;
 
-  const position = calculatePosition(tokens, token);
+    setLoading(true);
+    localStorage.setItem("myPhone", phone);
+
+    let unsub = null;
+
+    async function listenOrder() {
+      const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
+      const session = sessionSnap.exists()
+        ? sessionSnap.data().session_id
+        : "Session 1";
+
+      const q = query(
+        collection(db, "orders"),
+        where("phone", "==", phone),
+        where("session_id", "==", session),
+        orderBy("createdAt", "asc")
+      );
+
+      unsub = onSnapshot(q, snap => {
+        const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        if (!orders.length) {
+          setActiveOrder(null);
+          setCompleted(false);
+          setLoading(false);
+          return;
+        }
+
+        const nonCompleted = orders.filter(o => o.status !== "completed");
+
+        if (!nonCompleted.length) {
+          setCompleted(true);
+          setActiveOrder(null);
+          setLoading(false);
+          return;
+        }
+
+        const active = nonCompleted.sort(
+          (a, b) => (a.queueOrder ?? 999) - (b.queueOrder ?? 999)
+        )[0];
+
+        setActiveOrder(active);
+        setCompleted(false);
+        setLoading(false);
+      });
+    }
+
+    listenOrder();
+    return () => unsub && unsub();
+  }, [phone]);
+
+  /* 📍 CORRECT POSITION LOGIC (FIXED) */
+  useEffect(() => {
+    if (!activeOrder?.queueOrder) {
+      setPosition(null);
+      return;
+    }
+
+    async function calcPosition() {
+      const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
+      const session = sessionSnap.exists()
+        ? sessionSnap.data().session_id
+        : "Session 1";
+
+      const q = query(
+        collection(db, "orders"),
+        where("session_id", "==", session),
+        where("status", "in", ["approved", "paid", "called", "serving"])
+      );
+
+      const snap = await getDocs(q);
+
+      const ahead = snap.docs
+        .map(d => d.data())
+        .filter(
+          o =>
+            o.queueOrder < activeOrder.queueOrder &&
+            o.status !== "completed"
+        );
+
+      setPosition(ahead.length);
+    }
+
+    calcPosition();
+  }, [activeOrder]);
+
+  /* ⚠️ SKIPPED (GRACEFUL) */
+  const isSkipped =
+    activeOrder &&
+    activeOrder.status === "skipped";
+
+  /* 🚨 IMMEDIATE ACTION */
   const isImmediate =
-    token.status === "called" || token.status === "serving";
+    activeOrder &&
+    (activeOrder.status === "called" ||
+      activeOrder.status === "serving");
 
   return (
-    <div className={`status-screen ${isImmediate ? "urgent" : ""}`}>
-      {/* SHOP HEADER */}
-      <header className="shop-header">
-        <img
-          src={shop.logoUrl}
-          alt="Shop Logo"
-          className="logo"
-        />
-        <h1>{shop.name}</h1>
-      </header>
+    <div style={{ ...page, ...(isImmediate ? urgentBg : {}) }}>
+      <div style={container}>
 
-      {/* TOKEN NUMBER */}
-      <div className="token-box">
-        <p className="label">Your Token</p>
-        <h2>{token.tokenNumber}</h2>
+        {/* HEADER */}
+        <div style={header}>
+          <img src="/logo.png" alt="Logo" style={{ height: 50 }} />
+          <h2 style={{ color: "#ffd166" }}>ABC SHOP</h2>
+          <div style={{ color: "#bfb39a" }}>Live Order Status</div>
+        </div>
+
+        {/* SEARCH */}
+        <div style={searchBox}>
+          <input
+            placeholder="Enter phone number"
+            value={phone}
+            onChange={e => setPhone(e.target.value)}
+            style={input}
+          />
+        </div>
+
+        {loading && <div style={{ textAlign: "center" }}>Loading…</div>}
+
+        {/* ⏳ NOT APPROVED */}
+        {activeOrder && activeOrder.status === "pending" && (
+          <div style={card}>
+            <h3>Please wait while staff approves your order</h3>
+          </div>
+        )}
+
+        {/* ⚠️ SKIPPED */}
+        {isSkipped && (
+          <div style={{ ...card, borderLeft: "8px solid #ff7a00" }}>
+            <h3>Your token was skipped</h3>
+            <p>Please come to the counter and wait for staff.</p>
+          </div>
+        )}
+
+        {/* 🎟️ ACTIVE TOKEN */}
+        {activeOrder &&
+          ["approved", "paid", "called", "serving"].includes(activeOrder.status) && (
+            <div style={card}>
+              <div style={tokenNumber}>
+                TOKEN {activeOrder.token}
+              </div>
+
+              <div>Now Serving: <b>{current || "-"}</b></div>
+
+              {position === 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <b>You’re next. Please come near the counter.</b>
+                </div>
+              )}
+
+              {position > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  {position} people before you
+                </div>
+              )}
+
+              <div style={{ marginTop: 10 }}>
+                Amount: ₹{Number(activeOrder.total || 0).toFixed(2)}
+              </div>
+
+              <button style={btn} onClick={() => setShowItems(true)}>
+                View ordered items
+              </button>
+            </div>
+          )}
+
+        {/* ✅ COMPLETED */}
+        {completed && (
+          <div style={{ ...card, borderLeft: "8px solid #2ecc71" }}>
+            <h3>Order completed</h3>
+            <p>Please collect your order</p>
+          </div>
+        )}
+
+        {/* ℹ️ INFO */}
+        <button style={btn} onClick={() => setShowInfo(true)}>
+          How this works
+        </button>
+
+        <Link href="/">
+          <button style={btn}>Back to Menu</button>
+        </Link>
+
+        <Footer />
       </div>
 
-      {/* SKIPPED MESSAGE */}
-      {token.status === "skipped" && (
-        <p className="warning">
-          Your token was skipped.
-          <br />
-          Please go to the counter and wait for staff.
-        </p>
+      {/* ITEMS MODAL */}
+      {showItems && (
+        <Modal onClose={() => setShowItems(false)}>
+          {(activeOrder.items || []).map((i, idx) => (
+            <div key={idx}>{i.quantity} × {i.name}</div>
+          ))}
+        </Modal>
       )}
 
-      {/* POSITION */}
-      {position !== null && (
-        <p className="position">
-          {position === 0
-            ? "You are next"
-            : `People before you: ${position}`}
-        </p>
+      {/* INFO MODAL */}
+      {showInfo && (
+        <Modal onClose={() => setShowInfo(false)}>
+          <p>• Tokens are served in order</p>
+          <p>• If you miss your call, token may be skipped</p>
+          <p>• Skipped tokens are served manually by staff</p>
+          <p>• Your turn is never cancelled</p>
+        </Modal>
       )}
-
-      {/* IMMEDIATE ACTION */}
-      {isImmediate && (
-        <div className="call-now">
-          PLEASE COME TO THE COUNTER NOW
-        </div>
-      )}
-
-      {/* INFO BUTTON */}
-      <button
-        className="info-btn"
-        onClick={() =>
-          alert(
-            `How this works:
-• Tokens are served in order
-• If you are not present, your token may be skipped
-• Skipped tokens are served manually by staff
-• Your turn is never cancelled`
-          )
-        }
-      >
-        How this works
-      </button>
     </div>
   );
 }
+
+/* STYLES */
+const page = { background: "#0b0b0b", minHeight: "100vh", color: "#f6e8c1", padding: 20 };
+const urgentBg = { background: "#7a0000", animation: "pulse 1s infinite" };
+const container = { maxWidth: 720, margin: "auto" };
+const header = { textAlign: "center", marginBottom: 20 };
+const searchBox = { background: "#111", padding: 16, borderRadius: 12 };
+const input = { width: "100%", padding: 12, background: "#0c0c0c", color: "#fff", borderRadius: 8, border: "1px solid #222" };
+const card = { marginTop: 20, background: "#111", padding: 20, borderRadius: 12, borderLeft: "8px solid #ffd166", textAlign: "center" };
+const tokenNumber = { fontSize: 60, fontWeight: 900, color: "#ffd166" };
+const btn = { marginTop: 12, padding: "10px 14px", background: "#222", color: "#ffd166", border: "none", borderRadius: 8, fontWeight: 800 };
+
+function Modal({ children, onClose }) {
+  return (
+    <div style={modalBg}>
+      <div style={modal}>
+        {children}
+        <button style={btn} onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+const modalBg = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" };
+const modal = { background: "#111", padding: 20, borderRadius: 12, width: "90%", maxWidth: 400 };
