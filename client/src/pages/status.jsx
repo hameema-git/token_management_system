@@ -176,7 +176,11 @@ export default function TokenStatus() {
       return;
     }
 
-    setOrders(active.reverse()); // latest token first
+    // setOrders(active.reverse()); // latest token first
+    setOrders(
+    active.sort((a, b) => (a.token || 0) - (b.token || 0))
+  );
+
     setCompleted(false);
     setLoading(false);
   }
