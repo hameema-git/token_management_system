@@ -1,14 +1,12 @@
-// client/src/pages/status.jsx
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseInit";
 import {
-  query,
   collection,
+  query,
   where,
   orderBy,
-  getDocs,
-  doc,
   getDoc,
+  doc,
   onSnapshot
 } from "firebase/firestore";
 import { Link } from "wouter";
@@ -22,185 +20,108 @@ const styles = {
   title: { fontSize: 22, fontWeight: 900, color: "#ffd166" },
   subtitle: { color: "#bfb39a", fontSize: 13 },
 
-  inputRow: {
-    background: "#111",
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 18
-  },
-  input: {
-    width: "100%",
-    padding: 10,
-    borderRadius: 8,
-    border: "1px solid #222",
-    background: "#0c0c0c",
-    color: "#fff"
-  },
-  findBtn: {
-    marginTop: 8,
-    padding: "10px 14px",
-    background: "#ffd166",
-    color: "#111",
-    border: "none",
-    borderRadius: 8,
-    fontWeight: 800,
-    cursor: "pointer"
-  },
+  inputRow: { background: "#111", padding: 14, borderRadius: 10, marginBottom: 18 },
+  input: { width: "100%", padding: 10, borderRadius: 8, border: "1px solid #222", background: "#0c0c0c", color: "#fff" },
+  findBtn: { marginTop: 8, padding: "10px 14px", background: "#ffd166", color: "#111", border: "none", borderRadius: 8, fontWeight: 800 },
 
-  card: {
-    marginTop: 14,
-    padding: 20,
-    borderRadius: 12,
-    background: "#111",
-    borderLeft: "8px solid #ffd166",
-    textAlign: "center"
-  },
-  skippedCard: {
-    marginTop: 14,
-    padding: 20,
-    borderRadius: 12,
-    background: "#111",
-    borderLeft: "8px solid #ff7a00",
-    textAlign: "center"
-  },
-  completedCard: {
-    marginTop: 20,
-    padding: 22,
-    borderRadius: 12,
-    background: "#111",
-    borderLeft: "8px solid #2ecc71",
-    textAlign: "center"
-  },
+  card: { marginTop: 14, padding: 20, borderRadius: 12, background: "#111", borderLeft: "8px solid #ffd166", textAlign: "center" },
+  skippedCard: { marginTop: 14, padding: 20, borderRadius: 12, background: "#111", borderLeft: "8px solid #ff7a00", textAlign: "center" },
+  completedCard: { marginTop: 20, padding: 22, borderRadius: 12, background: "#111", borderLeft: "8px solid #2ecc71", textAlign: "center" },
 
-  viewBtn: {
-    marginTop: 12,
-    background: "#333",
-    color: "#ffd166",
-    padding: "8px 12px",
-    borderRadius: 8,
-    border: "none",
-    fontWeight: 800,
-    cursor: "pointer"
-  },
-
-  bottomRow: { display: "flex", gap: 12, marginTop: 30 },
-  btn: {
-    flex: 1,
-    padding: "14px",
-    borderRadius: 8,
-    border: "none",
-    fontWeight: 800,
-    cursor: "pointer"
-  },
+  btn: { padding: 10, borderRadius: 8, border: "none", fontWeight: 800, cursor: "pointer" },
   backBtn: { background: "#222", color: "#ffd166" },
   refreshBtn: { background: "#ffd166", color: "#111" },
-  helpBtn: {
-    marginTop: 12,
-    background: "#333",
-    color: "#ffd166",
-    padding: 12,
-    borderRadius: 8,
-    border: "none",
-    fontWeight: 800
-  }
+  itemBtn: { marginTop: 10, background: "#333", color: "#ffd166" },
+
+  modalBackdrop: {
+    position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
+  },
+  modal: { background: "#111", padding: 20, borderRadius: 12, width: "90%", maxWidth: 400 }
 };
 
 /* ---------------- COMPONENT ---------------- */
 export default function TokenStatus() {
-  const params = new URLSearchParams(window.location.search);
-  const initialPhone =
-    params.get("phone") || localStorage.getItem("myPhone") || "";
-
-  const [phone, setPhone] = useState(initialPhone);
+  const [phone, setPhone] = useState("");
   const [current, setCurrent] = useState(0);
   const [orders, setOrders] = useState([]);
   const [completed, setCompleted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
+  const [showItems, setShowItems] = useState(null);
 
-  const [showItems, setShowItems] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-
-  /* -------- CURRENT TOKEN LISTENER -------- */
+  /* -------- SAFE LOAD PHONE (VERCEL SAFE) -------- */
   useEffect(() => {
-    let unsubscribe;
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const saved =
+      params.get("phone") || localStorage.getItem("myPhone") || "";
+    setPhone(saved);
+  }, []);
+
+  /* -------- REALTIME CURRENT TOKEN -------- */
+  useEffect(() => {
+    let unsub;
 
     async function listenToken() {
-      const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
-      const session = sessionSnap.exists()
-        ? sessionSnap.data().session_id
-        : "Session 1";
+      const snap = await getDoc(doc(db, "settings", "activeSession"));
+      const session = snap.exists() ? snap.data().session_id : "Session 1";
 
-      unsubscribe = onSnapshot(
-        doc(db, "tokens", "session_" + session),
-        snap => {
-          if (snap.exists()) {
-            setCurrent(snap.data().currentToken || 0);
-          }
-        }
-      );
+      unsub = onSnapshot(doc(db, "tokens", "session_" + session), s => {
+        if (s.exists()) setCurrent(s.data().currentToken || 0);
+      });
     }
 
     listenToken();
-    return () => unsubscribe && unsubscribe();
+    return () => unsub && unsub();
   }, []);
 
-  /* -------- LOAD ALL ORDERS FOR PHONE -------- */
-  async function loadOrder() {
+  /* -------- REALTIME ORDERS (AUTO REFRESH) -------- */
+  useEffect(() => {
     if (!phone) return;
-    setLoading(true);
 
-    const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
-    const session = sessionSnap.exists()
-      ? sessionSnap.data().session_id
-      : "Session 1";
+    let unsub;
 
-    const q = query(
-      collection(db, "orders"),
-      where("phone", "==", String(phone)),
-      where("session_id", "==", session),
-      orderBy("createdAt", "asc")
-    );
+    async function listenOrders() {
+      const snap = await getDoc(doc(db, "settings", "activeSession"));
+      const session = snap.exists() ? snap.data().session_id : "Session 1";
 
-    const snap = await getDocs(q);
-    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const q = query(
+        collection(db, "orders"),
+        where("phone", "==", String(phone)),
+        where("session_id", "==", session),
+        orderBy("token", "asc") // ✅ ASCENDING ORDER
+      );
 
-    if (!list.length) {
-      setOrders([]);
-      setCompleted(false);
-      setLoading(false);
-      return;
+      unsub = onSnapshot(q, snap => {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const active = list.filter(o => o.status !== "completed");
+
+        if (!active.length && list.length) {
+          setCompleted(true);
+          setOrders([]);
+        } else {
+          setCompleted(false);
+          setOrders(active);
+        }
+      });
     }
 
-    const active = list.filter(o => o.status !== "completed");
-
-    if (!active.length) {
-      setCompleted(true);
-      setOrders([]);
-      setLoading(false);
-      return;
-    }
-
-    // ✅ ASCENDING TOKEN ORDER (token to be served first shown first)
-    active.sort((a, b) => (a.token || 0) - (b.token || 0));
-
-    setOrders(active);
-    setCompleted(false);
-    setLoading(false);
-  }
+    listenOrders();
+    return () => unsub && unsub();
+  }, [phone]);
 
   function handleFind() {
-    localStorage.setItem("myPhone", phone);
-    loadOrder();
+    if (typeof window !== "undefined") {
+      localStorage.setItem("myPhone", phone);
+    }
   }
 
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-
         <div style={styles.header}>
           <div style={styles.title}>Waffle Lounge — Order Status</div>
-          <div style={styles.subtitle}>Track your order in real time</div>
+          <div style={styles.subtitle}>Live token tracking</div>
         </div>
 
         <div style={styles.inputRow}>
@@ -210,48 +131,34 @@ export default function TokenStatus() {
             onChange={e => setPhone(e.target.value)}
             style={styles.input}
           />
-          <button style={styles.findBtn} onClick={handleFind}>
-            Find Order
-          </button>
+          <button style={styles.findBtn} onClick={handleFind}>Find Order</button>
         </div>
-
-        {loading && <div style={{ textAlign: "center" }}>Loading…</div>}
 
         {/* TOKENS */}
         {orders.map(o => {
           const position = o.token - current;
-          const isSkipped = position < 0;
+          const skipped = position < 0;
 
           return (
-            <div key={o.id} style={isSkipped ? styles.skippedCard : styles.card}>
-              <div style={{ fontSize: 52, fontWeight: 900 }}>
-                TOKEN {o.token}
-              </div>
+            <div key={o.id} style={skipped ? styles.skippedCard : styles.card}>
+              <div style={{ fontSize: 46, fontWeight: 900 }}>TOKEN {o.token}</div>
+              <div>Now Serving: <b>{current || "-"}</b></div>
 
-              <div>
-                Now Serving: <b>{current || "-"}</b>
-              </div>
-
-              {isSkipped ? (
-                <div style={{ marginTop: 10 }}>
-                  ⚠ Your token was skipped
-                  <br />
-                  Please go to the staff counter
+              {skipped ? (
+                <div style={{ marginTop: 8 }}>
+                  ⚠ Token skipped — come to counter
                 </div>
               ) : (
-                <div style={{ marginTop: 10 }}>
+                <div style={{ marginTop: 8 }}>
                   Position: <b>{position}</b>
                 </div>
               )}
 
               <button
-                style={styles.viewBtn}
-                onClick={() => {
-                  setSelectedOrder(o);
-                  setShowItems(true);
-                }}
+                style={{ ...styles.btn, ...styles.itemBtn }}
+                onClick={() => setShowItems(o)}
               >
-                View Ordered Items
+                View Items
               </button>
             </div>
           );
@@ -259,106 +166,36 @@ export default function TokenStatus() {
 
         {completed && (
           <div style={styles.completedCard}>
-            <div style={{ fontSize: 24, fontWeight: 900 }}>
-              ✅ Order Completed
-            </div>
-            <div>Please collect your order at the counter</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>✅ Order Completed</div>
+            Please collect your order
           </div>
         )}
 
-        <button style={styles.helpBtn} onClick={() => setShowHelp(true)}>
-          How this works
-        </button>
-
-        <div style={styles.bottomRow}>
+        <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
           <Link href="/">
-            <button style={{ ...styles.btn, ...styles.backBtn }}>
-              Back to Menu
-            </button>
+            <button style={{ ...styles.btn, ...styles.backBtn }}>Back</button>
           </Link>
-          <button
-            style={{ ...styles.btn, ...styles.refreshBtn }}
-            onClick={loadOrder}
-          >
-            Refresh
-          </button>
+          <button style={{ ...styles.btn, ...styles.refreshBtn }}>Live</button>
         </div>
 
         <Footer />
       </div>
 
-      {/* ITEMS POPUP */}
-      {showItems && selectedOrder && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999
-          }}
-          onClick={() => setShowItems(false)}
-        >
-          <div
-            style={{
-              background: "#111",
-              padding: 20,
-              borderRadius: 12,
-              width: "90%",
-              maxWidth: 400
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 style={{ color: "#ffd166" }}>
-              Token {selectedOrder.token}
-            </h3>
+      {/* ITEMS MODAL */}
+      {showItems && (
+        <div style={styles.modalBackdrop} onClick={() => setShowItems(null)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <h3>Token {showItems.token} Items</h3>
 
-            {(selectedOrder.items || []).map((i, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "6px 0"
-                }}
-              >
-                <div>{i.quantity} × {i.name}</div>
+            {(showItems.items || []).map((i, idx) => (
+              <div key={idx} style={{ marginTop: 8 }}>
+                {i.quantity} × {i.name}
               </div>
             ))}
 
             <button
-              style={{ ...styles.findBtn, marginTop: 14 }}
-              onClick={() => setShowItems(false)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* HELP MODAL */}
-      {showHelp && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}
-        >
-          <div style={{ background: "#111", padding: 20, borderRadius: 12, maxWidth: 400 }}>
-            <h3>How tokens work</h3>
-            <p>• Tokens are served in order</p>
-            <p>• Position shows how many are before you</p>
-            <p>• If position is negative, your token was skipped</p>
-            <p>• Skipped customers must come to staff counter</p>
-            <button
-              style={styles.findBtn}
-              onClick={() => setShowHelp(false)}
+              style={{ ...styles.btn, ...styles.refreshBtn, marginTop: 14 }}
+              onClick={() => setShowItems(null)}
             >
               Close
             </button>
