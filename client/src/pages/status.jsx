@@ -21,14 +21,14 @@ export default function TokenStatus() {
 
   const [phone, setPhone] = useState(initialPhone);
   const [current, setCurrent] = useState(0);
-  const [activeOrder, setActiveOrder] = useState(null);
+  const [activeOrders, setActiveOrders] = useState([]);
   const [completed, setCompleted] = useState(false);
-  const [position, setPosition] = useState(null);
+  const [positionMap, setPositionMap] = useState({});
   const [loading, setLoading] = useState(false);
-  const [showItems, setShowItems] = useState(false);
+  const [showItems, setShowItems] = useState(null);
   const [showInfo, setShowInfo] = useState(false);
 
-  /* 🔴 LIVE CURRENT TOKEN (AUTO REFRESH) */
+  /* 🔴 LIVE CURRENT TOKEN */
   useEffect(() => {
     let unsub = null;
 
@@ -52,7 +52,7 @@ export default function TokenStatus() {
     return () => unsub && unsub();
   }, []);
 
-  /* 🔍 LOAD CUSTOMER ORDER (LIVE) */
+  /* 🔍 LOAD ALL ORDERS FOR PHONE (LIVE) */
   useEffect(() => {
     if (!phone) return;
 
@@ -61,7 +61,7 @@ export default function TokenStatus() {
 
     let unsub = null;
 
-    async function listenOrder() {
+    async function listenOrders() {
       const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
       const session = sessionSnap.exists()
         ? sessionSnap.data().session_id
@@ -71,51 +71,38 @@ export default function TokenStatus() {
         collection(db, "orders"),
         where("phone", "==", phone),
         where("session_id", "==", session),
-        orderBy("createdAt", "asc")
+        orderBy("queueOrder", "asc")
       );
 
       unsub = onSnapshot(q, snap => {
         const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        if (!orders.length) {
-          setActiveOrder(null);
-          setCompleted(false);
-          setLoading(false);
-          return;
-        }
-
         const nonCompleted = orders.filter(o => o.status !== "completed");
 
         if (!nonCompleted.length) {
+          setActiveOrders([]);
           setCompleted(true);
-          setActiveOrder(null);
           setLoading(false);
           return;
         }
 
-        // 🔑 Pick earliest active order (queueOrder based)
-        const active = nonCompleted.sort(
-          (a, b) => (a.queueOrder ?? 999) - (b.queueOrder ?? 999)
-        )[0];
-
-        setActiveOrder(active);
+        setActiveOrders(nonCompleted);
         setCompleted(false);
         setLoading(false);
       });
     }
 
-    listenOrder();
+    listenOrders();
     return () => unsub && unsub();
   }, [phone]);
 
-  /* 📍 POSITION CALCULATION (FIXED – FAIR & STABLE) */
+  /* 📍 POSITION CALCULATION FOR ALL ACTIVE ORDERS */
   useEffect(() => {
-    if (!activeOrder?.queueOrder) {
-      setPosition(null);
-      return;
-    }
+    async function calcPositions() {
+      if (!activeOrders.length) {
+        setPositionMap({});
+        return;
+      }
 
-    async function calcPosition() {
       const sessionSnap = await getDoc(doc(db, "settings", "activeSession"));
       const session = sessionSnap.exists()
         ? sessionSnap.data().session_id
@@ -128,26 +115,30 @@ export default function TokenStatus() {
       );
 
       const snap = await getDocs(q);
+      const allActive = snap.docs.map(d => d.data());
 
-      const ahead = snap.docs
-        .map(d => d.data())
-        .filter(o => o.queueOrder < activeOrder.queueOrder);
+      const map = {};
+      activeOrders.forEach(order => {
+        map[order.id] = allActive.filter(
+          o => o.queueOrder < order.queueOrder
+        ).length;
+      });
 
-      setPosition(ahead.length);
+      setPositionMap(map);
     }
 
-    calcPosition();
-  }, [activeOrder]);
+    calcPositions();
+  }, [activeOrders]);
 
-  /* ⚠️ SKIPPED TOKEN */
-  const isSkipped =
-    activeOrder && activeOrder.status === "skipped";
+  /* 🎯 CURRENT SERVING ORDER (FIRST NON-SKIPPED) */
+  const currentOrder = activeOrders.find(
+    o => o.status !== "skipped"
+  );
 
-  /* 🚨 IMMEDIATE ACTION TOKEN */
   const isImmediate =
-    activeOrder &&
-    (activeOrder.status === "called" ||
-      activeOrder.status === "serving");
+    currentOrder &&
+    (currentOrder.status === "called" ||
+      currentOrder.status === "serving");
 
   return (
     <div style={{ ...page, ...(isImmediate ? urgentBg : {}) }}>
@@ -172,66 +163,62 @@ export default function TokenStatus() {
 
         {loading && <div style={{ textAlign: "center" }}>Loading…</div>}
 
-        {/* ⏳ NOT APPROVED */}
-        {activeOrder && activeOrder.status === "pending" && (
+        {/* ⚠️ SKIPPED TOKENS */}
+        {activeOrders
+          .filter(o => o.status === "skipped")
+          .map(o => (
+            <div
+              key={o.id}
+              style={{ ...card, borderLeft: "8px solid #ff7a00" }}
+            >
+              <h3>Token {o.token} was skipped</h3>
+              <p>
+                Please go to the staff counter and wait.
+                <br />
+                You will be served in the next available turn.
+              </p>
+              <div>
+                Current position:{" "}
+                <b>{positionMap[o.id]}</b>
+              </div>
+            </div>
+          ))}
+
+        {/* 🎟️ ACTIVE / CURRENT TOKEN */}
+        {currentOrder && (
           <div style={card}>
-            <h3>Please wait while staff approves your order</h3>
-          </div>
-        )}
+            <div style={tokenNumber}>
+              TOKEN {currentOrder.token}
+            </div>
 
-        {/* ⚠️ SKIPPED MESSAGE */}
-        {isSkipped && (
-          <div style={{ ...card, borderLeft: "8px solid #ff7a00" }}>
-            <h3>Your token was skipped</h3>
-            <p>
-              Please go to the staff counter and wait.
-              <br />
-              You will be served in the next available turn.
-            </p>
+            <div>
+              Now Serving: <b>{current || "-"}</b>
+            </div>
 
-            {position !== null && (
+            {positionMap[currentOrder.id] === 0 && (
               <div style={{ marginTop: 10 }}>
-                Current position: <b>{position}</b>
+                <b>You’re next. Please come near the counter.</b>
               </div>
             )}
+
+            {positionMap[currentOrder.id] > 0 && (
+              <div style={{ marginTop: 10 }}>
+                {positionMap[currentOrder.id]} people before you
+              </div>
+            )}
+
+            <div style={{ marginTop: 10 }}>
+              Amount: ₹{Number(currentOrder.total || 0).toFixed(2)}
+            </div>
+
+            <button
+              style={btn}
+              onClick={() => setShowItems(currentOrder)}
+            >
+              View ordered items
+            </button>
           </div>
         )}
-
-        {/* 🎟️ ACTIVE TOKEN */}
-        {activeOrder &&
-          ["approved", "paid", "called", "serving", "skipped"].includes(
-            activeOrder.status
-          ) && (
-            <div style={card}>
-              <div style={tokenNumber}>
-                TOKEN {activeOrder.token}
-              </div>
-
-              <div>
-                Now Serving: <b>{current || "-"}</b>
-              </div>
-
-              {position === 0 && !isSkipped && (
-                <div style={{ marginTop: 10 }}>
-                  <b>You’re next. Please come near the counter.</b>
-                </div>
-              )}
-
-              {position > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  {position} people before you
-                </div>
-              )}
-
-              <div style={{ marginTop: 10 }}>
-                Amount: ₹{Number(activeOrder.total || 0).toFixed(2)}
-              </div>
-
-              <button style={btn} onClick={() => setShowItems(true)}>
-                View ordered items
-              </button>
-            </div>
-          )}
 
         {/* ✅ COMPLETED */}
         {completed && (
@@ -255,8 +242,8 @@ export default function TokenStatus() {
 
       {/* ITEMS MODAL */}
       {showItems && (
-        <Modal onClose={() => setShowItems(false)}>
-          {(activeOrder?.items || []).map((i, idx) => (
+        <Modal onClose={() => setShowItems(null)}>
+          {(showItems.items || []).map((i, idx) => (
             <div key={idx}>
               {i.quantity} × {i.name}
             </div>
@@ -290,11 +277,7 @@ const urgentBg = {
 };
 const container = { maxWidth: 720, margin: "auto" };
 const header = { textAlign: "center", marginBottom: 20 };
-const searchBox = {
-  background: "#111",
-  padding: 16,
-  borderRadius: 12
-};
+const searchBox = { background: "#111", padding: 16, borderRadius: 12 };
 const input = {
   width: "100%",
   padding: 12,
