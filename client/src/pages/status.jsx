@@ -1,3 +1,4 @@
+// client/src/pages/TokenStatus.jsx
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseInit";
 import {
@@ -27,7 +28,7 @@ export default function TokenStatus() {
   const [showItems, setShowItems] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
-  /* 🔴 LIVE CURRENT TOKEN */
+  /* 🔴 LIVE CURRENT TOKEN (AUTO REFRESH) */
   useEffect(() => {
     let unsub = null;
 
@@ -40,7 +41,9 @@ export default function TokenStatus() {
       unsub = onSnapshot(
         doc(db, "tokens", "session_" + session),
         snap => {
-          if (snap.exists()) setCurrent(snap.data().currentToken || 0);
+          if (snap.exists()) {
+            setCurrent(snap.data().currentToken || 0);
+          }
         }
       );
     }
@@ -49,7 +52,7 @@ export default function TokenStatus() {
     return () => unsub && unsub();
   }, []);
 
-  /* 🔍 LOAD CUSTOMER ORDER */
+  /* 🔍 LOAD CUSTOMER ORDER (LIVE) */
   useEffect(() => {
     if (!phone) return;
 
@@ -90,6 +93,7 @@ export default function TokenStatus() {
           return;
         }
 
+        // 🔑 Pick earliest active order (queueOrder based)
         const active = nonCompleted.sort(
           (a, b) => (a.queueOrder ?? 999) - (b.queueOrder ?? 999)
         )[0];
@@ -104,7 +108,7 @@ export default function TokenStatus() {
     return () => unsub && unsub();
   }, [phone]);
 
-  /* 📍 CORRECT POSITION LOGIC (FIXED) */
+  /* 📍 POSITION CALCULATION (FIXED – FAIR & STABLE) */
   useEffect(() => {
     if (!activeOrder?.queueOrder) {
       setPosition(null);
@@ -120,18 +124,14 @@ export default function TokenStatus() {
       const q = query(
         collection(db, "orders"),
         where("session_id", "==", session),
-        where("status", "in", ["approved", "paid", "called", "serving"])
+        where("status", "!=", "completed")
       );
 
       const snap = await getDocs(q);
 
       const ahead = snap.docs
         .map(d => d.data())
-        .filter(
-          o =>
-            o.queueOrder < activeOrder.queueOrder &&
-            o.status !== "completed"
-        );
+        .filter(o => o.queueOrder < activeOrder.queueOrder);
 
       setPosition(ahead.length);
     }
@@ -139,12 +139,11 @@ export default function TokenStatus() {
     calcPosition();
   }, [activeOrder]);
 
-  /* ⚠️ SKIPPED (GRACEFUL) */
+  /* ⚠️ SKIPPED TOKEN */
   const isSkipped =
-    activeOrder &&
-    activeOrder.status === "skipped";
+    activeOrder && activeOrder.status === "skipped";
 
-  /* 🚨 IMMEDIATE ACTION */
+  /* 🚨 IMMEDIATE ACTION TOKEN */
   const isImmediate =
     activeOrder &&
     (activeOrder.status === "called" ||
@@ -180,25 +179,39 @@ export default function TokenStatus() {
           </div>
         )}
 
-        {/* ⚠️ SKIPPED */}
+        {/* ⚠️ SKIPPED MESSAGE */}
         {isSkipped && (
           <div style={{ ...card, borderLeft: "8px solid #ff7a00" }}>
             <h3>Your token was skipped</h3>
-            <p>Please come to the counter and wait for staff.</p>
+            <p>
+              Please go to the staff counter and wait.
+              <br />
+              You will be served in the next available turn.
+            </p>
+
+            {position !== null && (
+              <div style={{ marginTop: 10 }}>
+                Current position: <b>{position}</b>
+              </div>
+            )}
           </div>
         )}
 
         {/* 🎟️ ACTIVE TOKEN */}
         {activeOrder &&
-          ["approved", "paid", "called", "serving"].includes(activeOrder.status) && (
+          ["approved", "paid", "called", "serving", "skipped"].includes(
+            activeOrder.status
+          ) && (
             <div style={card}>
               <div style={tokenNumber}>
                 TOKEN {activeOrder.token}
               </div>
 
-              <div>Now Serving: <b>{current || "-"}</b></div>
+              <div>
+                Now Serving: <b>{current || "-"}</b>
+              </div>
 
-              {position === 0 && (
+              {position === 0 && !isSkipped && (
                 <div style={{ marginTop: 10 }}>
                   <b>You’re next. Please come near the counter.</b>
                 </div>
@@ -224,7 +237,7 @@ export default function TokenStatus() {
         {completed && (
           <div style={{ ...card, borderLeft: "8px solid #2ecc71" }}>
             <h3>Order completed</h3>
-            <p>Please collect your order</p>
+            <p>Please collect your order at the counter</p>
           </div>
         )}
 
@@ -243,8 +256,10 @@ export default function TokenStatus() {
       {/* ITEMS MODAL */}
       {showItems && (
         <Modal onClose={() => setShowItems(false)}>
-          {(activeOrder.items || []).map((i, idx) => (
-            <div key={idx}>{i.quantity} × {i.name}</div>
+          {(activeOrder?.items || []).map((i, idx) => (
+            <div key={idx}>
+              {i.quantity} × {i.name}
+            </div>
           ))}
         </Modal>
       )}
@@ -253,7 +268,7 @@ export default function TokenStatus() {
       {showInfo && (
         <Modal onClose={() => setShowInfo(false)}>
           <p>• Tokens are served in order</p>
-          <p>• If you miss your call, token may be skipped</p>
+          <p>• If you miss your call, your token may be skipped</p>
           <p>• Skipped tokens are served manually by staff</p>
           <p>• Your turn is never cancelled</p>
         </Modal>
@@ -263,26 +278,79 @@ export default function TokenStatus() {
 }
 
 /* STYLES */
-const page = { background: "#0b0b0b", minHeight: "100vh", color: "#f6e8c1", padding: 20 };
-const urgentBg = { background: "#7a0000", animation: "pulse 1s infinite" };
+const page = {
+  background: "#0b0b0b",
+  minHeight: "100vh",
+  color: "#f6e8c1",
+  padding: 20
+};
+const urgentBg = {
+  background: "#7a0000",
+  animation: "pulse 1s infinite"
+};
 const container = { maxWidth: 720, margin: "auto" };
 const header = { textAlign: "center", marginBottom: 20 };
-const searchBox = { background: "#111", padding: 16, borderRadius: 12 };
-const input = { width: "100%", padding: 12, background: "#0c0c0c", color: "#fff", borderRadius: 8, border: "1px solid #222" };
-const card = { marginTop: 20, background: "#111", padding: 20, borderRadius: 12, borderLeft: "8px solid #ffd166", textAlign: "center" };
-const tokenNumber = { fontSize: 60, fontWeight: 900, color: "#ffd166" };
-const btn = { marginTop: 12, padding: "10px 14px", background: "#222", color: "#ffd166", border: "none", borderRadius: 8, fontWeight: 800 };
+const searchBox = {
+  background: "#111",
+  padding: 16,
+  borderRadius: 12
+};
+const input = {
+  width: "100%",
+  padding: 12,
+  background: "#0c0c0c",
+  color: "#fff",
+  borderRadius: 8,
+  border: "1px solid #222"
+};
+const card = {
+  marginTop: 20,
+  background: "#111",
+  padding: 20,
+  borderRadius: 12,
+  borderLeft: "8px solid #ffd166",
+  textAlign: "center"
+};
+const tokenNumber = {
+  fontSize: 60,
+  fontWeight: 900,
+  color: "#ffd166"
+};
+const btn = {
+  marginTop: 12,
+  padding: "10px 14px",
+  background: "#222",
+  color: "#ffd166",
+  border: "none",
+  borderRadius: 8,
+  fontWeight: 800
+};
 
 function Modal({ children, onClose }) {
   return (
     <div style={modalBg}>
       <div style={modal}>
         {children}
-        <button style={btn} onClick={onClose}>Close</button>
+        <button style={btn} onClick={onClose}>
+          Close
+        </button>
       </div>
     </div>
   );
 }
 
-const modalBg = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" };
-const modal = { background: "#111", padding: 20, borderRadius: 12, width: "90%", maxWidth: 400 };
+const modalBg = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.6)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center"
+};
+const modal = {
+  background: "#111",
+  padding: 20,
+  borderRadius: 12,
+  width: "90%",
+  maxWidth: 400
+};
