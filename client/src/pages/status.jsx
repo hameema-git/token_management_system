@@ -30,12 +30,17 @@ const styles = {
 
   btn: { padding: 10, borderRadius: 8, border: "none", fontWeight: 800, cursor: "pointer" },
   backBtn: { background: "#222", color: "#ffd166" },
-  refreshBtn: { background: "#ffd166", color: "#111" },
+  helpBtn: { background: "#333", color: "#ffd166" },
   itemBtn: { marginTop: 10, background: "#333", color: "#ffd166" },
 
   modalBackdrop: {
-    position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
-    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,.6)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 9999
   },
   modal: { background: "#111", padding: 20, borderRadius: 12, width: "90%", maxWidth: 400 }
 };
@@ -47,21 +52,18 @@ export default function TokenStatus() {
   const [orders, setOrders] = useState([]);
   const [completed, setCompleted] = useState(false);
   const [showItems, setShowItems] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
 
-  /* -------- SAFE LOAD PHONE (VERCEL SAFE) -------- */
+  /* -------- SAFE LOAD PHONE -------- */
   useEffect(() => {
     if (typeof window === "undefined") return;
-
     const params = new URLSearchParams(window.location.search);
-    const saved =
-      params.get("phone") || localStorage.getItem("myPhone") || "";
-    setPhone(saved);
+    setPhone(params.get("phone") || localStorage.getItem("myPhone") || "");
   }, []);
 
   /* -------- REALTIME CURRENT TOKEN -------- */
   useEffect(() => {
     let unsub;
-
     async function listenToken() {
       const snap = await getDoc(doc(db, "settings", "activeSession"));
       const session = snap.exists() ? snap.data().session_id : "Session 1";
@@ -70,15 +72,13 @@ export default function TokenStatus() {
         if (s.exists()) setCurrent(s.data().currentToken || 0);
       });
     }
-
     listenToken();
     return () => unsub && unsub();
   }, []);
 
-  /* -------- REALTIME ORDERS (AUTO REFRESH) -------- */
+  /* -------- REALTIME ORDERS -------- */
   useEffect(() => {
     if (!phone) return;
-
     let unsub;
 
     async function listenOrders() {
@@ -89,7 +89,7 @@ export default function TokenStatus() {
         collection(db, "orders"),
         where("phone", "==", String(phone)),
         where("session_id", "==", session),
-        orderBy("token", "asc") // ✅ ASCENDING ORDER
+        orderBy("token", "asc")
       );
 
       unsub = onSnapshot(q, snap => {
@@ -144,15 +144,17 @@ export default function TokenStatus() {
               <div style={{ fontSize: 46, fontWeight: 900 }}>TOKEN {o.token}</div>
               <div>Now Serving: <b>{current || "-"}</b></div>
 
-              {skipped ? (
-                <div style={{ marginTop: 8 }}>
-                  ⚠ Token skipped — come to counter
-                </div>
-              ) : (
-                <div style={{ marginTop: 8 }}>
+              {!skipped ? (
+                <div style={{ marginTop: 6 }}>
                   Position: <b>{position}</b>
                 </div>
+              ) : (
+                <div style={{ marginTop: 6 }}>⚠ Token skipped — go to counter</div>
               )}
+
+              <div style={{ marginTop: 6 }}>
+                Amount to Pay: <b>₹{o.total || 0}</b>
+              </div>
 
               <button
                 style={{ ...styles.btn, ...styles.itemBtn }}
@@ -175,7 +177,12 @@ export default function TokenStatus() {
           <Link href="/">
             <button style={{ ...styles.btn, ...styles.backBtn }}>Back</button>
           </Link>
-          <button style={{ ...styles.btn, ...styles.refreshBtn }}>Live</button>
+          <button
+            style={{ ...styles.btn, ...styles.helpBtn }}
+            onClick={() => setShowHelp(true)}
+          >
+            Help
+          </button>
         </div>
 
         <Footer />
@@ -185,7 +192,7 @@ export default function TokenStatus() {
       {showItems && (
         <div style={styles.modalBackdrop} onClick={() => setShowItems(null)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <h3>Token {showItems.token} Items</h3>
+            <h3>Token {showItems.token}</h3>
 
             {(showItems.items || []).map((i, idx) => (
               <div key={idx} style={{ marginTop: 8 }}>
@@ -193,9 +200,34 @@ export default function TokenStatus() {
               </div>
             ))}
 
+            <div style={{ marginTop: 10, fontWeight: 800 }}>
+              Total: ₹{showItems.total || 0}
+            </div>
+
             <button
-              style={{ ...styles.btn, ...styles.refreshBtn, marginTop: 14 }}
+              style={{ ...styles.btn, ...styles.helpBtn, marginTop: 14 }}
               onClick={() => setShowItems(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* HELP MODAL */}
+      {showHelp && (
+        <div style={styles.modalBackdrop} onClick={() => setShowHelp(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <h3>How this page works</h3>
+            <p>• <b>Token</b>: Your order number</p>
+            <p>• <b>Now Serving</b>: Current token at counter</p>
+            <p>• <b>Position</b>: Tokens remaining before yours</p>
+            <p>• <b>Skipped</b>: Please visit the counter</p>
+            <p>• <b>Amount</b>: Amount to be paid at counter</p>
+
+            <button
+              style={{ ...styles.btn, ...styles.helpBtn, marginTop: 12 }}
+              onClick={() => setShowHelp(false)}
             >
               Close
             </button>
